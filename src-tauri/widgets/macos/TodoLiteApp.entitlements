@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 主应用保持非沙盒（Tauri 需要），仅声明 App Groups，
+	     使 macOS 允许本进程创建/写入 group.com.syn.todolite 容器。
+	     与小组件扩展的 TodoLiteWidget.entitlements 保持同一组名。 -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.syn.todolite</string>
+	</array>
+</dict>
+</plist>

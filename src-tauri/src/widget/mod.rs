@@ -20,6 +20,9 @@ pub struct WidgetTaskRef {
     pub title: String,
     pub list_name: String,
     pub due_date: Option<String>,
+    /// 0 无 / 1 低 / 2 中 / 3 高；默认值保证旧快照仍可解码
+    #[serde(default)]
+    pub priority: u8,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -29,6 +32,9 @@ pub struct WidgetCounts {
     pub upcoming: u32,
     pub all: u32,
     pub completed_today: u32,
+    /// 高优先级（priority=3）未完成总数，v1.1 新增
+    #[serde(default)]
+    pub high_priority: u32,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -37,6 +43,9 @@ pub struct WidgetSnapshot {
     pub generated_at: String,
     pub today: Vec<WidgetTaskRef>,
     pub overdue: Vec<WidgetTaskRef>,
+    /// 高优先级（priority=3）未完成任务，与到期日无关；v1.1 新增
+    #[serde(default)]
+    pub high_priority: Vec<WidgetTaskRef>,
     pub counts: WidgetCounts,
 }
 

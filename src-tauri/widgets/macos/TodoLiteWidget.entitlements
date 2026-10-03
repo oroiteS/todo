@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 说明：本项目当前走 ad-hoc/无团队签名路线（见 docs/widget-adaptation.md），
+	     App Group 容器在无签名环境下由系统拒绝创建，因此扩展不开 App Sandbox，
+	     以便在主应用回退到 App Data 目录时仍能读到快照。
+	     正式上架/公证前：恢复 com.apple.security.app-sandbox = true 并使用真实签名，
+	     届时扩展将只从 App Group 容器读取。 -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.syn.todolite</string>
+	</array>
+</dict>
+</plist>
