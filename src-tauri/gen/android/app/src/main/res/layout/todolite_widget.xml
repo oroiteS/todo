@@ -2,7 +2,11 @@
 <!-- TodoLite 桌面小组件布局（4x2）。
      根布局使用 @android:id/background 且带背景色：系统按此 ID 统一裁切圆角
      （Android 12+ 自动识别；MIUI/ColorOS 等同样按该 ID 处理）。
-     任务行用 TextView + 前缀彩色圆点（Spannable 上色），RemoteViews 不支持动态增删 View。 -->
+     任务区两列（各 4 行；RemoteViews 不支持动态增删 View，行位固定）：
+       - ≤4 条：单列展示（右列隐藏，左列占满整行）
+       - >4 条：自动两列；>8 条时底部显示"……"省略提示
+     每行：彩色 □ 方框前缀（逾期红 / 今日灰 / 高优橙）+ 标题（超 6 字截断加……），
+     行底灰色划线（@drawable/todolite_widget_rule，划线本风格）。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@android:id/background"
     android:layout_width="match_parent"
@@ -45,50 +49,90 @@
             android:text="❗ 0" />
     </LinearLayout>
 
-    <!-- 任务行（至多 4 条，渲染时填充或隐藏；圆点颜色：逾期红 / 今日灰 / 高优橙） -->
-    <TextView
-        android:id="@+id/todolite_widget_task0"
+    <!-- 任务区：两列（左列 task0-3，右列 task4-7） -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="7dp"
-        android:textSize="13sp"
-        android:textColor="@color/todolite_widget_ink"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:visibility="gone" />
+        android:orientation="horizontal">
 
-    <TextView
-        android:id="@+id/todolite_widget_task1"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:textSize="13sp"
-        android:textColor="@color/todolite_widget_ink"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:visibility="gone" />
+        <LinearLayout
+            android:id="@+id/todolite_widget_col0"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginEnd="10dp"
+            android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/todolite_widget_task2"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:textSize="13sp"
-        android:textColor="@color/todolite_widget_ink"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:visibility="gone" />
+            <TextView
+                android:id="@+id/todolite_widget_task0"
+                style="@style/TodoliteWidgetTask"
+                android:layout_marginTop="8dp"
+                android:text="" />
 
+            <TextView
+                android:id="@+id/todolite_widget_task1"
+                style="@style/TodoliteWidgetTask"
+                android:layout_marginTop="6dp"
+                android:text="" />
+
+            <TextView
+                android:id="@+id/todolite_widget_task2"
+                style="@style/TodoliteWidgetTask"
+                android:layout_marginTop="6dp"
+                android:text="" />
+
+            <TextView
+                android:id="@+id/todolite_widget_task3"
+                style="@style/TodoliteWidgetTask"
+                android:layout_marginTop="6dp"
+                android:text="" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/todolite_widget_col1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/todolite_widget_task4"
+                style="@style/TodoliteWidgetTask"
+                android:layout_marginTop="8dp"
+                android:text="" />
+
+            <TextView
+                android:id="@+id/todolite_widget_task5"
+                style="@style/TodoliteWidgetTask"
+                android:layout_marginTop="6dp"
+                android:text="" />
+
+            <TextView
+                android:id="@+id/todolite_widget_task6"
+                style="@style/TodoliteWidgetTask"
+                android:layout_marginTop="6dp"
+                android:text="" />
+
+            <TextView
+                android:id="@+id/todolite_widget_task7"
+                style="@style/TodoliteWidgetTask"
+                android:layout_marginTop="6dp"
+                android:text="" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 溢出提示：超过 8 条时显示省略号 -->
     <TextView
-        android:id="@+id/todolite_widget_task3"
+        android:id="@+id/todolite_widget_more"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:textSize="13sp"
-        android:textColor="@color/todolite_widget_ink"
+        android:layout_marginTop="5dp"
+        android:textSize="11sp"
+        android:textColor="@color/todolite_widget_ink2"
         android:maxLines="1"
-        android:ellipsize="end"
-        android:visibility="gone" />
+        android:visibility="gone"
+        android:text="……" />
 
     <!-- 空状态 / 引导文案 -->
     <TextView

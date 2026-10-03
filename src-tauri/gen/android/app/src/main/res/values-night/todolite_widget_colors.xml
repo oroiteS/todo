@@ -10,6 +10,8 @@
     <color name="todolite_widget_dot_today">#FF5C5C66</color>
     <!-- ink2: #a4a4af -->
     <color name="todolite_widget_ink2">#FFA4A4AF</color>
+    <!-- line: #26262b（任务行划线） -->
+    <color name="todolite_widget_line">#FF26262B</color>
     <!-- danger: #f87171 -->
     <color name="todolite_widget_danger">#FFF87171</color>
     <!-- warn: #fb923c -->

@@ -42,8 +42,17 @@ class TodoliteWidgetProvider : AppWidgetProvider() {
   companion object {
     private const val TAG = "TodoliteWidget"
 
-    /** 4x2 布局可稳定展示的任务行数 */
+    /** 每列可稳定展示的任务行数（4x2 布局） */
     private const val MAX_ROWS = 4
+
+    /** 列数上限：任务数 >MAX_ROWS 时自动两列，不再增加 */
+    private const val MAX_COLS = 2
+
+    /** 合计最多展示条数（两列 × 每列 4 行） */
+    private const val MAX_VISIBLE = MAX_ROWS * MAX_COLS
+
+    /** 单条标题超过该字数即截断并追加"……" */
+    private const val MAX_CHARS = 6
 
     /**
      * 主应用写完快照后立即刷新所有已添加的组件实例。
@@ -76,8 +85,14 @@ class TodoliteWidgetProvider : AppWidgetProvider() {
         R.id.todolite_widget_task1,
         R.id.todolite_widget_task2,
         R.id.todolite_widget_task3,
+        R.id.todolite_widget_task4,
+        R.id.todolite_widget_task5,
+        R.id.todolite_widget_task6,
+        R.id.todolite_widget_task7,
       )
       taskIds.forEach { views.setViewVisibility(it, View.GONE) }
+      views.setViewVisibility(R.id.todolite_widget_col1, View.GONE)
+      views.setViewVisibility(R.id.todolite_widget_more, View.GONE)
       views.setViewVisibility(R.id.todolite_widget_empty, View.GONE)
       views.setViewVisibility(R.id.todolite_widget_high_badge, View.GONE)
 
@@ -133,8 +148,9 @@ class TodoliteWidgetProvider : AppWidgetProvider() {
         views.setViewVisibility(R.id.todolite_widget_high_badge, View.VISIBLE)
       }
 
-      // 任务行：逾期（红点）→ 今日（灰点）→ 高优先级（橙点），按 id 去重，最多 4 行
-      val rows = ArrayList<CharSequence>(MAX_ROWS)
+      // 任务行：逾期（红框）→ 今日（灰框）→ 高优先级（橙框），按 id 去重。
+      // >4 条自动两列；>8 条只展示前 8 条，底部"……"提示溢出。
+      val rows = ArrayList<CharSequence>()
       val seen = HashSet<String>()
       val dotOverdue = ContextCompat.getColor(context, R.color.todolite_widget_danger)
       val dotToday = ContextCompat.getColor(context, R.color.todolite_widget_dot_today)
@@ -154,9 +170,19 @@ class TodoliteWidgetProvider : AppWidgetProvider() {
         )
         views.setViewVisibility(R.id.todolite_widget_empty, View.VISIBLE)
       } else {
-        rows.take(MAX_ROWS).forEachIndexed { index, row ->
+        val visible = rows.take(MAX_VISIBLE)
+        visible.forEachIndexed { index, row ->
           views.setTextViewText(taskIds[index], row)
           views.setViewVisibility(taskIds[index], View.VISIBLE)
+        }
+        // 第二列：仅在条数超过单列容量时出现（否则左列占满整行）
+        views.setViewVisibility(
+          R.id.todolite_widget_col1,
+          if (visible.size > MAX_ROWS) View.VISIBLE else View.GONE,
+        )
+        // 溢出提示
+        if (rows.size > MAX_VISIBLE) {
+          views.setViewVisibility(R.id.todolite_widget_more, View.VISIBLE)
         }
       }
 
@@ -164,7 +190,7 @@ class TodoliteWidgetProvider : AppWidgetProvider() {
       return views
     }
 
-    /** 追加一个分组的任务行（带彩色圆点前缀），按 id 去重 */
+    /** 追加一个分组的任务行（带彩色 □ 方框前缀），按 id 去重；不设上限（由调用方截取） */
     private fun collectRows(
       rows: MutableList<CharSequence>,
       seen: MutableSet<String>,
@@ -173,13 +199,12 @@ class TodoliteWidgetProvider : AppWidgetProvider() {
     ) {
       if (tasks == null) return
       for (i in 0 until tasks.length()) {
-        if (rows.size >= MAX_ROWS) return
         val task = tasks.optJSONObject(i) ?: continue
         val id = task.optString("id")
         if (id.isNotEmpty() && !seen.add(id)) continue
         val title = task.optString("title")
         if (title.isEmpty()) continue
-        val row = SpannableString("●  $title")
+        val row = SpannableString("□ ${truncate(title, MAX_CHARS)}")
         row.setSpan(
           ForegroundColorSpan(dotColor),
           0,
@@ -188,6 +213,12 @@ class TodoliteWidgetProvider : AppWidgetProvider() {
         )
         rows.add(row)
       }
+    }
+
+    /** 按字数（码点）截断：超过 [max] 个字时保留前 [max] 字并追加省略号 */
+    private fun truncate(text: String, max: Int): String {
+      if (text.codePointCount(0, text.length) <= max) return text
+      return text.substring(0, text.offsetByCodePoints(0, max)) + "……"
     }
 
     // --------------------------------------------------------------- 数据

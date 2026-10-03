@@ -131,12 +131,13 @@ macOS 已实现（WidgetKit，内容为**今日待办 + 高优先级任务**）�
 构建方式与签名限制见 [docs/widget-adaptation.md](docs/widget-adaptation.md)。
 
 Android 已实现（**标准 AppWidget + RemoteViews**，同一快照数据通道）：
-4x2 组件展示「今天 · N」标题（含红色逾期计数）+ 至多 4 条任务
-（逾期红点 / 今日灰点 / 高优橙点，按 id 去重）+ 高优「❗ M」徽标；
-深浅色跟随系统（静态 `-night` 资源），点击整卡打开应用。数据变更后
-**实时刷新**（写快照后 JNI 直调 `AppWidgetManager.updateAppWidget`），
-30 分钟系统轮询兜底。无任何签名/厂商认证要求。实现细节见
-[docs/widget-adaptation.md](docs/widget-adaptation.md) 第 5 节。
+4x2 组件展示「今天 · N」标题（含红色逾期计数）+ 高优「❗ M」徽标；任务行
+**≤4 条单列、>4 条自动两列**（最多 2×4=8 条，超出底部"……"提示），每行
+彩色 **□ 方框**前缀（逾期红 / 今日灰 / 高优橙）+ **划线本式灰线**，标题
+超 6 字自动截断加"……"；深浅色跟随系统（静态 `-night` 资源），点击整卡
+打开应用。数据变更后**实时刷新**（写快照后 JNI 直调
+`AppWidgetManager.updateAppWidget`），30 分钟系统轮询兜底。无任何
+签名/厂商认证要求。实现细节见 [docs/widget-adaptation.md](docs/widget-adaptation.md) 第 5 节。
 
 ## 目录结构
 

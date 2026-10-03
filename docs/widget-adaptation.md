@@ -147,8 +147,10 @@ open src-tauri/target/release/bundle/macos/TodoLite.app
   `AppWidgetManager.updateAppWidget` —— **实时刷新**。系统 30 分钟轮询
   （`updatePeriodMillis`）与桌面重建仅作兜底。JNI 调用任何失败都静默，
   组件最迟仍由轮询兜底刷新。
-- **渲染约束**：RemoteViews 不支持动态增删 View，任务行是布局里固定的 4 个
-  TextView（无任务时隐藏）；行内容用 SpannableString 给「●」圆点上色。
+- **渲染约束**：RemoteViews 不支持动态增删 View。任务行固定 8 个 TextView
+  分两列（每列 4 个）：≤4 条单列（右列隐藏），>4 条自动两列，>8 条底部
+  "……"提示；行前缀为彩色 □ 方框（SpannableString 上色），标题超 6 字按
+  码点截断加"……"；行底 1dp 灰线来自 `todolite_widget_rule`（layer-list）。
 - **点击**：整卡 `PendingIntent.getActivity` 直达 MainActivity（Android 12+ 禁 trampoline）。
 - **快照缺失/损坏**：显示「打开 TodoLite 同步小组件数据」引导，不崩。
 - **验证**：`ANDROID_HOME=$HOME/Library/Android/sdk ./gradlew :app:compileDebugKotlin`

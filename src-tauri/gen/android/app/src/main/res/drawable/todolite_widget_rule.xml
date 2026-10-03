@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 划线本风格：任务行底部 1dp 灰线。
+     gravity 属性需 API 23+（minSdk 24 满足）；颜色走 -night 资源随系统深浅色。 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:gravity="bottom">
+        <shape android:shape="rectangle">
+            <size android:height="1dp" />
+            <solid android:color="@color/todolite_widget_line" />
+        </shape>
+    </item>
+</layer-list>

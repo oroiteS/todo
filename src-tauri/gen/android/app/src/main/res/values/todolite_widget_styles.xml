@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TodoLite 小组件任务行公共样式：单行截断 + 行底灰色划线（划线本风格）。
+     背景是 1dp 底线 drawable，paddingBottom 让文字坐在划线之上。 -->
+<resources>
+    <style name="TodoliteWidgetTask">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">@color/todolite_widget_ink</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:paddingBottom">3dp</item>
+        <item name="android:background">@drawable/todolite_widget_rule</item>
+        <item name="android:visibility">gone</item>
+    </style>
+</resources>

@@ -9,6 +9,8 @@
     <color name="todolite_widget_dot_today">#FF9C9CA6</color>
     <!-- ink2: #6b6b74（次要文字） -->
     <color name="todolite_widget_ink2">#FF6B6B74</color>
+    <!-- line: #e2e2e6（任务行划线） -->
+    <color name="todolite_widget_line">#FFE2E2E6</color>
     <!-- danger: #dc2626（逾期） -->
     <color name="todolite_widget_danger">#FFDC2626</color>
     <!-- warn: #ea580c（高优先级） -->
