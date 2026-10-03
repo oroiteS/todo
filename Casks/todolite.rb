@@ -5,11 +5,12 @@ cask "todolite" do
   sha256 arm:   "95a398fe34421057692d6ff627137db9408471d68e1b3d92c2130231196ebc54",
          intel: "dfd60f7c39726aee6cfcafb63bfee258d123990d29f4a21e160a7fe85bf9cc05"
 
-  url "https://github.com/oroiteS/todo/releases/download/v#{version}/TodoLite_#{version}_#{arch}.dmg",
-      verified: "github.com/oroiteS/todo/"
+  url "https://github.com/oroiteS/todo/releases/download/v#{version}/TodoLite_#{version}_#{arch}.dmg"
   name "TodoLite"
   desc "Lightweight and beautiful cross-platform todo list"
   homepage "https://github.com/oroiteS/todo"
+
+  depends_on :macos
 
   livecheck do
     url :url
