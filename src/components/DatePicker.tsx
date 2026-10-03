@@ -12,9 +12,11 @@ import { useClickOutside } from "./Dropdown";
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 const MONTH_LABELS = Array.from({ length: 12 }, (_, i) => `${i + 1}月`);
 
-/** 年份可选范围 */
-const MIN_YEAR = 2000;
-const MAX_YEAR = 2100;
+/** 年份可选范围：动态锚定当前年份（不随时间流逝过期）
+ *  例如 2026 年 → 1926 ~ 2136（往前 100 年，往后 110 年） */
+const NOW_YEAR = new Date().getFullYear();
+const MIN_YEAR = NOW_YEAR - 100;
+const MAX_YEAR = NOW_YEAR + 110;
 
 function formatFull(dateStr: string): string {
   const d = parseDate(dateStr);
