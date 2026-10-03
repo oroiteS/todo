@@ -20,3 +20,7 @@ src-tauri/gen/android/app/keystore.properties
 src-tauri/gen/android/app/tauri.properties
 src-tauri/gen/android/app/tauri.build.gradle.kts
 
+# 本地调研材料(不入库)
+android-widget-跨平台调研/
+widget_research/
+
