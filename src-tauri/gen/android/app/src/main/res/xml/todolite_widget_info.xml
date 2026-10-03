@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- TodoLite AppWidget 描述信息（4x2，半小时兜底刷新）。
-     updatePeriodMillis 系统最小值为 30 分钟；数据实际由主应用变更时写快照，
-     组件在每次系统触发 onUpdate 时重读，因此内容最多滞后半小时。 -->
+<!-- TodoLite AppWidget 描述信息（4x2）。
+     数据由主应用每次变更后写快照并经 JNI 直调 refreshAll() 实时刷新；
+     updatePeriodMillis（系统最小 30 分钟）仅作兜底轮询。 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="250dp"
     android:minHeight="110dp"

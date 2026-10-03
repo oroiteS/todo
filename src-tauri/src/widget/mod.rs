@@ -69,5 +69,39 @@ pub fn write_widget_snapshot(
     }
     std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
     log::debug!("widget snapshot written: {:?}", path);
+
+    // Android：写完快照后立即刷新组件实例。若不主动通知，系统只会按
+    // updatePeriodMillis（最小 30 分钟，且常被省电策略推迟）轮询，
+    // 用户看到的就是「组件永远停在添加那一刻的状态」。
+    #[cfg(target_os = "android")]
+    notify_android_widget();
+
     Ok(true)
+}
+
+/// Android 即时刷新：通过 wry 的 JNI dispatch 在主线程调
+/// `TodoliteWidgetProvider.refreshAll(context)`——重读快照文件并对所有
+/// 已添加实例执行 `AppWidgetManager.updateAppWidget`。
+/// 类查找必须走 `wry::prelude::find_class`（经 Activity 的 ClassLoader，
+/// 系统 ClassLoader 加载不到应用类）。任何失败都静默：快照已落盘，
+/// 组件最迟仍会由系统轮询兜底刷新。
+#[cfg(target_os = "android")]
+fn notify_android_widget() {
+    use jni::objects::JValue;
+    wry::prelude::dispatch(|env, activity, _webview| {
+        let _ = env.exception_clear();
+        if let Ok(class) = wry::prelude::find_class(
+            env,
+            activity,
+            "com.syn.todolite.TodoliteWidgetProvider".to_string(),
+        ) {
+            let _ = env.call_static_method(
+                class,
+                "refreshAll",
+                "(Landroid/content/Context;)V",
+                &[JValue::Object(activity)],
+            );
+        }
+        let _ = env.exception_clear();
+    });
 }

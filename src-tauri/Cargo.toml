@@ -1,6 +1,6 @@
 [package]
 name = "todolite"
-version = "0.2.3"
+version = "0.2.4"
 description = "TodoLite — 轻量、好看的跨平台待办清单"
 authors = ["syn"]
 edition = "2021"
@@ -25,6 +25,13 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 # Android 端不依赖 keyring，使用应用私有目录文件存储（见 commands.rs）
 [target.'cfg(not(target_os = "android"))'.dependencies]
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+
+# Android 端：小组件即时刷新——写快照后经 wry 的 JNI dispatch 直调
+# TodoliteWidgetProvider.refreshAll(context)，绕过 30 分钟系统轮询。
+# wry/jni 版本与 tauri 依赖树中的版本保持一致（Cargo.lock 已锁定）。
+[target.'cfg(target_os = "android")'.dependencies]
+wry = { version = "0.57", default-features = false }
+jni = "0.21"
 
 [profile.release]
 codegen-units = 1

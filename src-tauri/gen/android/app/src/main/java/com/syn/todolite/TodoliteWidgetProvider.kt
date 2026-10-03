@@ -2,8 +2,8 @@
 //
 // 内容：今日待办 + 高优先级任务（与 macOS WidgetKit 小组件同一数据通道）。
 // 数据：主应用（Rust）每次数据变更后把 WidgetSnapshot（camelCase JSON）写到
-// 应用私有目录 widget/widget-snapshot.json；本组件在系统触发 onUpdate 时
-// 读取渲染，updatePeriodMillis = 30 分钟兜底轮询。
+// 应用私有目录 widget/widget-snapshot.json，并经 JNI 调 refreshAll() 实时刷新；
+// updatePeriodMillis = 30 分钟兜底轮询（系统最小值）。
 //   - Tauri `app_data_dir()` 在 Android 上解析为 dataDir（/data/user/0/<pkg>），
 //     因此快照实际落点为 dataDir/widget/；filesDir/widget/ 作为兼容回退一并探测。
 // 快照 schema：src/bridge/widget.ts ↔ src-tauri/src/widget/mod.rs，
@@ -14,6 +14,7 @@ package com.syn.todolite
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.text.SpannableStringBuilder
@@ -39,6 +40,22 @@ class TodoliteWidgetProvider : AppWidgetProvider() {
   companion object {
     /** 4x2 布局可稳定展示的任务行数 */
     private const val MAX_ROWS = 4
+
+    /**
+     * 主应用写完快照后立即刷新所有已添加的组件实例。
+     * 由 Rust 侧通过 JNI 调用（wry dispatch），绕过系统最长 30 分钟的
+     * updatePeriodMillis 轮询滞后；没有已添加实例时静默返回。
+     */
+    @JvmStatic
+    fun refreshAll(context: Context) {
+      val manager = AppWidgetManager.getInstance(context)
+      val ids = manager.getAppWidgetIds(
+        ComponentName(context, TodoliteWidgetProvider::class.java),
+      )
+      if (ids.isEmpty()) return
+      val views = render(context)
+      for (id in ids) manager.updateAppWidget(id, views)
+    }
 
     // --------------------------------------------------------------- 渲染
 

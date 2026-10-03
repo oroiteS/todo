@@ -141,10 +141,12 @@ open src-tauri/target/release/bundle/macos/TodoLite.app
 
 ### 5.2 行为与限制
 
-- **刷新时机**：主应用写快照后不发广播（Kotlin 桥接暂缺，见施工清单遗留项），依赖
-  系统 30 分钟轮询 + 桌面重建（添加组件、重启桌面等）重读。快照永远是最新写入，
-  组件展示最多滞后半小时。后续可让 Rust 写完快照后触发一次
-  `AppWidgetManager.actionAppWidgetUpdate` 广播实现即时刷新（预留）。
+- **刷新时机**：主应用每次数据变更写完快照后，Rust 侧经 wry 的 JNI dispatch
+  （`wry::prelude::dispatch` + `find_class`，走 Activity 的 ClassLoader）直调
+  `TodoliteWidgetProvider.refreshAll(context)`，立即对所有已添加实例
+  `AppWidgetManager.updateAppWidget` —— **实时刷新**。系统 30 分钟轮询
+  （`updatePeriodMillis`）与桌面重建仅作兜底。JNI 调用任何失败都静默，
+  组件最迟仍由轮询兜底刷新。
 - **渲染约束**：RemoteViews 不支持动态增删 View，任务行是布局里固定的 4 个
   TextView（无任务时隐藏）；行内容用 SpannableString 给「●」圆点上色。
 - **点击**：整卡 `PendingIntent.getActivity` 直达 MainActivity（Android 12+ 禁 trampoline）。
@@ -154,7 +156,8 @@ open src-tauri/target/release/bundle/macos/TodoLite.app
 
 ### 5.3 后续可选增强（原施工清单遗留项）
 
-1. Kotlin 插件桥：Rust 写完快照后发 `AppWidgetManager` 广播实现秒级刷新；
+1. ~~Kotlin 插件桥：Rust 写完快照后发 `AppWidgetManager` 广播实现秒级刷新~~
+   （已实现：不走广播，JNI 直调 `refreshAll()` 同步刷新，见 5.2）；
 2. `ListView` + `RemoteViewsFactory` 展示更多条目；
 3. 按任务条目区分点击目标（打开应用并定位到对应任务）；
 4. 如迁移 Glance：`GlanceAppWidget.provideGlance` 读同一快照文件即可。
