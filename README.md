@@ -33,13 +33,15 @@
 
 ## 安装（Homebrew · macOS）
 
-仓库根目录的 `Casks/` 让本仓库可以直接作为 Homebrew tap 使用，无需额外建仓库：
+仓库根目录的 `Casks/` 让本仓库可以直接作为 Homebrew tap 使用，无需额外建仓库。
+因仓库未按 `homebrew-` 前缀命名，需先用双参数形式显式 tap：
 
 ```bash
+brew tap oroiteS/todo https://github.com/oroiteS/todo
 brew install --cask oroiteS/todo/todolite
 ```
 
-该命令会自动 tap 本仓库并安装 Release 中的 dmg（Apple Silicon / Intel 自动选择对应架构）。
+安装 Release 中的 dmg（Apple Silicon / Intel 自动选择对应架构）。
 之后跟随新版本发布即可：
 
 ```bash
