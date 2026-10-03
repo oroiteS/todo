@@ -68,12 +68,15 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <TitleBar />
-      <div className="flex min-h-0 flex-1">
-        <Sidebar />
-        <TaskListPane />
-        <DetailPane />
+    <div className="flex h-full overflow-hidden">
+      <Sidebar />
+      {/* 主区：不透明纯黑，与玻璃侧栏形成层次 */}
+      <div className="flex min-w-0 flex-1 flex-col bg-bg">
+        <TitleBar />
+        <div className="flex min-h-0 flex-1">
+          <TaskListPane />
+          <DetailPane />
+        </div>
       </div>
       <SettingsModal />
     </div>

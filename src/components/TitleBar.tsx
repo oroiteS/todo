@@ -2,7 +2,6 @@ import { Check, Loader2, Menu, Moon, RefreshCw, Search, Settings, Sun, TriangleA
 import { cn } from "@/lib/cn";
 import { formatRelativeTime } from "@/lib/format";
 import { systemPrefersDark } from "@/lib/theme";
-import { isMacLike } from "@/lib/tauri";
 import { useDataStore } from "@/stores/data";
 import { useSyncStore } from "@/stores/sync";
 import { useUiStore } from "@/stores/ui";
@@ -10,8 +9,8 @@ import { useUiStore } from "@/stores/ui";
 const iconBtn =
   "flex h-8 w-8 items-center justify-center rounded-lg text-ink2 transition-colors hover:bg-panel2 hover:text-ink";
 
+/** 主区工具栏（品牌与红绿灯在侧栏列） */
 export function TitleBar() {
-  const mac = isMacLike();
   const searchQuery = useUiStore((s) => s.searchQuery);
   const setSearch = useUiStore((s) => s.setSearch);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
@@ -33,10 +32,7 @@ export function TitleBar() {
   return (
     <header
       data-tauri-drag-region
-      className={cn(
-        "z-20 flex h-12 shrink-0 items-center gap-1.5 border-b border-line bg-bg/80 px-2.5 backdrop-blur-md",
-        mac && "pl-20",
-      )}
+      className="z-20 flex h-12 shrink-0 items-center gap-1.5 border-b border-line/70 bg-bg/85 px-2.5 backdrop-blur-md"
     >
       <button
         type="button"
@@ -46,18 +42,6 @@ export function TitleBar() {
       >
         <Menu size={17} />
       </button>
-
-      <span
-        className="mr-1 hidden shrink-0 text-[15px] font-extrabold tracking-tight sm:block"
-        style={{
-          backgroundImage: "linear-gradient(120deg,#f97316,var(--accent))",
-          WebkitBackgroundClip: "text",
-          backgroundClip: "text",
-          color: "transparent",
-        }}
-      >
-        TodoLite
-      </span>
 
       <div className="flex min-w-0 flex-1 justify-center px-1">
         <div className="relative w-full max-w-md">

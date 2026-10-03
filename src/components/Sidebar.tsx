@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { isMacLike } from "@/lib/tauri";
 import { LIST_COLORS, LIST_EMOJIS, type TaskList } from "@/core/models";
 import {
   activeTasks,
@@ -126,11 +127,32 @@ export function Sidebar() {
       )}
       <aside
         className={cn(
-          "fixed bottom-0 left-0 top-12 z-40 flex w-72 shrink-0 flex-col border-r border-line/70 bg-panel/70 backdrop-blur-xl transition-transform duration-200 md:static md:top-0 md:z-auto md:flex md:translate-x-0",
+          "fixed bottom-0 left-0 top-0 z-40 flex w-72 shrink-0 flex-col border-r border-line/60 bg-panel/95 backdrop-blur-2xl transition-transform duration-200 md:static md:z-auto md:flex md:translate-x-0 md:bg-[var(--sidebar)]",
           sidebarOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="min-h-0 flex-1 overflow-y-auto p-3 pt-4">
+        {/* 品牌区（macOS 红绿灯落在此处上方） */}
+        <div
+          data-tauri-drag-region
+          className={cn(
+            "flex h-12 shrink-0 items-center px-4",
+            isMacLike() && "pl-20",
+          )}
+        >
+          <span
+            className="text-[15px] font-extrabold tracking-tight"
+            style={{
+              backgroundImage: "linear-gradient(120deg,#f97316,var(--accent))",
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              color: "transparent",
+            }}
+          >
+            TodoLite
+          </span>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 pt-2">
           {/* 智能视图 */}
           <nav className="flex flex-col gap-1">
             <SmartItem
