@@ -7,15 +7,16 @@ pub const APP_GROUP_ID: &str = "group.com.syn.todolite";
 
 #[cfg(target_os = "macos")]
 pub fn snapshot_dir(app: &tauri::AppHandle) -> Option<PathBuf> {
-    // 优先 App Group 容器（需要正式签名 + entitlements，后续小组件任务启用）。
-    // 未启用时目录不存在，回退到应用数据目录，保证开发期快照同样可见。
+    // 优先 App Group 容器（WidgetKit 扩展以沙盒 + App Groups 权限读取）。
+    // 主应用非沙盒，目录不存在时直接创建即可；创建失败再回退应用数据目录。
     if let Ok(home) = std::env::var("HOME") {
         let group = PathBuf::from(home)
             .join("Library/Group Containers")
             .join(APP_GROUP_ID);
-        if group.is_dir() {
+        if group.is_dir() || std::fs::create_dir_all(&group).is_ok() {
             return Some(group);
         }
+        log::warn!("app group dir create failed, fallback to app data dir");
     }
     app.path()
         .app_data_dir()

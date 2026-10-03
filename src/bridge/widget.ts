@@ -7,33 +7,42 @@
 // 快照 schema 与平台路径详见 docs/widget-adaptation.md。
 
 import { invoke } from "@tauri-apps/api/core";
-import type { Database, Task } from "@/core/models";
+import type { Database, Priority, Task } from "@/core/models";
 import {
   activeTasks,
   completedTodayCount,
   listById,
+  sortTasks,
   todayTasks,
   upcomingTasks,
 } from "@/core/operations";
 import { isOverdue, isToday, todayStr } from "@/core/dates";
 import { isTauri } from "@/lib/tauri";
 
+/** 优先级：0 无 / 1 低 / 2 中 / 3 高（与 core/models 的 Priority 一致） */
+const HIGH_PRIORITY: Priority = 3;
+
 export interface WidgetTaskRef {
   id: string;
   title: string;
   listName: string;
   dueDate: string | null;
+  /** 0 无 / 1 低 / 2 中 / 3 高，供小组件渲染角标 */
+  priority: Priority;
 }
 
 export interface WidgetSnapshot {
   generatedAt: string;
   today: WidgetTaskRef[];
   overdue: WidgetTaskRef[];
+  /** 高优先级（priority=3）未完成任务，与到期日无关 */
+  highPriority: WidgetTaskRef[];
   counts: {
     today: number;
     upcoming: number;
     all: number;
     completedToday: number;
+    highPriority: number;
   };
 }
 
@@ -46,6 +55,7 @@ function toRef(db: Database, t: Task): WidgetTaskRef {
     title: t.title,
     listName: listById(db, t.listId)?.name ?? "",
     dueDate: t.dueDate ?? null,
+    priority: (t.priority ?? 0) as Priority,
   };
 }
 
@@ -58,15 +68,20 @@ export function buildSnapshot(db: Database, now: Date = new Date()): WidgetSnaps
   const overdue = dueTodayOrOverdue.filter(
     (t) => t.dueDate && isOverdue(t.dueDate, today),
   );
+  const highPriority = sortTasks(
+    activeTasks(db).filter((t) => (t.priority ?? 0) === HIGH_PRIORITY),
+  );
   return {
     generatedAt: now.toISOString(),
     today: todays.slice(0, SNAPSHOT_CAP).map((t) => toRef(db, t)),
     overdue: overdue.slice(0, SNAPSHOT_CAP).map((t) => toRef(db, t)),
+    highPriority: highPriority.slice(0, SNAPSHOT_CAP).map((t) => toRef(db, t)),
     counts: {
       today: todays.length,
       upcoming: upcomingTasks(db, today).length,
       all: activeTasks(db).length,
       completedToday: completedTodayCount(db, today),
+      highPriority: highPriority.length,
     },
   };
 }
