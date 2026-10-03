@@ -83,24 +83,36 @@ pub fn write_widget_snapshot(
 /// `TodoliteWidgetProvider.refreshAll(context)`——重读快照文件并对所有
 /// 已添加实例执行 `AppWidgetManager.updateAppWidget`。
 /// 类查找必须走 `wry::prelude::find_class`（经 Activity 的 ClassLoader，
-/// 系统 ClassLoader 加载不到应用类）。任何失败都静默：快照已落盘，
-/// 组件最迟仍会由系统轮询兜底刷新。
+/// 系统 ClassLoader 加载不到应用类）。
+/// ⚠️ 该方法依赖 proguard-rules.pro 的 keep 规则存活（R8 看不见 JNI 调用）。
+/// 失败降级：快照已落盘，组件最迟仍会由系统轮询兜底刷新。
 #[cfg(target_os = "android")]
 fn notify_android_widget() {
     use jni::objects::JValue;
     wry::prelude::dispatch(|env, activity, _webview| {
         let _ = env.exception_clear();
-        if let Ok(class) = wry::prelude::find_class(
+        // eprintln 在 debug 构建会进 logcat（System.err 标签），便于真机排查
+        eprintln!("[widget] notify_android_widget dispatched");
+        match wry::prelude::find_class(
             env,
             activity,
             "com.syn.todolite.TodoliteWidgetProvider".to_string(),
         ) {
-            let _ = env.call_static_method(
-                class,
-                "refreshAll",
-                "(Landroid/content/Context;)V",
-                &[JValue::Object(activity)],
-            );
+            Ok(class) => {
+                if let Err(e) = env.call_static_method(
+                    class,
+                    "refreshAll",
+                    "(Landroid/content/Context;)V",
+                    &[JValue::Object(activity)],
+                ) {
+                    eprintln!("[widget] refreshAll JNI call failed: {e}");
+                    log::warn!("widget refresh JNI call failed: {e}");
+                }
+            }
+            Err(e) => {
+                eprintln!("[widget] provider class not found: {e}");
+                log::warn!("widget provider class not found: {e}");
+            }
         }
         let _ = env.exception_clear();
     });

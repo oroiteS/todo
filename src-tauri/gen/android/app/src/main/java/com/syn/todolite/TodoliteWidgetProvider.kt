@@ -21,8 +21,10 @@ import android.text.SpannableStringBuilder
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
+import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
+import androidx.annotation.Keep
 import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
@@ -38,23 +40,31 @@ class TodoliteWidgetProvider : AppWidgetProvider() {
   }
 
   companion object {
+    private const val TAG = "TodoliteWidget"
+
     /** 4x2 布局可稳定展示的任务行数 */
     private const val MAX_ROWS = 4
 
     /**
      * 主应用写完快照后立即刷新所有已添加的组件实例。
-     * 由 Rust 侧通过 JNI 调用（wry dispatch），绕过系统最长 30 分钟的
-     * updatePeriodMillis 轮询滞后；没有已添加实例时静默返回。
+     * 由 Rust 侧通过 JNI 反射调用（wry dispatch）——⚠️ 必须加 @Keep：
+     * release 构建 R8 看不见 JNI 调用，不加会被改名/剔除（v0.2.4 即因此失效）。
+     * 没有已添加实例时静默返回。
      */
+    @Keep
     @JvmStatic
     fun refreshAll(context: Context) {
       val manager = AppWidgetManager.getInstance(context)
       val ids = manager.getAppWidgetIds(
         ComponentName(context, TodoliteWidgetProvider::class.java),
       )
+      Log.i(TAG, "refreshAll invoked: ${ids.size} instance(s)")
       if (ids.isEmpty()) return
-      val views = render(context)
-      for (id in ids) manager.updateAppWidget(id, views)
+      runCatching {
+        val views = render(context)
+        for (id in ids) manager.updateAppWidget(id, views)
+        Log.i(TAG, "refreshAll ok: ${ids.size} updated")
+      }.onFailure { Log.w(TAG, "refreshAll failed", it) }
     }
 
     // --------------------------------------------------------------- 渲染
