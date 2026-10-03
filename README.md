@@ -33,15 +33,13 @@
 
 ## 安装（Homebrew · macOS）
 
-仓库根目录的 `Casks/` 让本仓库可以直接作为 Homebrew tap 使用，无需额外建仓库。
-因仓库未按 `homebrew-` 前缀命名，需先用双参数形式显式 tap：
-
 ```bash
-brew tap oroiteS/todo https://github.com/oroiteS/todo
-brew install --cask oroiteS/todo/todolite
+brew install --cask oroiteS/tap/todolite
 ```
 
-安装 Release 中的 dmg（Apple Silicon / Intel 自动选择对应架构）。
+该命令自动 tap [oroiteS/homebrew-tap](https://github.com/oroiteS/homebrew-tap)
+并安装 Release 中的 dmg（Apple Silicon / Intel 自动选择对应架构）。
+cask 由 tap 仓库的定时 workflow 跟随最新 Release 自动更新 `version` 与 `sha256`，
 之后跟随新版本发布即可：
 
 ```bash
@@ -143,7 +141,6 @@ src-tauri/            Tauri 壳
 ├── widgets/macos/    ★ macOS WidgetKit 小组件（SwiftUI，swiftc 构建）
 └── gen/android/      Android Studio 工程（已入库）
 scripts/              构建辅助（macOS 小组件嵌入、Android 密钥等）
-Casks/                Homebrew tap（macOS cask，随 Release 自动升级）
 .github/workflows/    三端构建 CI
 ```
 
