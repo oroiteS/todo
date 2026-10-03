@@ -96,17 +96,30 @@ open src-tauri/target/release/bundle/macos/TodoLite.app
   主应用是 Rust 进程，暂无法直接调 `WidgetCenter.reloadTimelines()`；
   如需秒级刷新，后续可加一个 Swift 助手或为 Tauri 桥接 ObjC，见 Roadmap。
 
-### 4.5 已知限制（当前 ad-hoc 路线）
+### 4.5 已知限制与最终结论（2026-10 实测）
 
-- **App Group 容器需要真实签名**：macOS 只为有 Team 签名的进程创建
-  `~/Library/Group Containers/<group>` 容器（Xcode 中开启 App Groups 同样要求
-  选 Team）。ad-hoc 本地运行时主应用创建会被系统拒绝（EPERM），快照自动回退到
-  `~/Library/Application Support/com.syn.todolite/widget/`。
-- **因此扩展暂不开启 App Sandbox**：无沙盒的扩展才能在回退路径下读到快照，
-  保证"无签名也能用"。正式上架/公证前需做两件事：
-  1. 用开发者身份签名（App Group 注册到对应 Team），届时主应用能正常创建容器；
-  2. 在 `TodoLiteWidget.entitlements` 恢复 `com.apple.security.app-sandbox = true`
-     （扩展届时只从 Group 容器读取，该行文件内有注释标记）。
+**结论：画廊枚举需要完整系统身份（开发者签名 + App Group profile + 公证链），
+免费账号无法达成，小组件定位为「本地构建可选功能」。**
+
+已实测四种形态全部被 WidgetKit 在枚举阶段过滤（画廊不可见，且无任何加载日志）：
+
+| 形态 | 结果 |
+|---|---|
+| ad-hoc + 空 entitlements | ❌ 不枚举 |
+| ad-hoc + 沙盒 + groups（无 profile） | ❌ 不枚举 |
+| Apple Development 签名 + 沙盒 + groups（无 profile） | ❌ 不枚举 |
+| Apple Development 签名 + 无沙盒 + 空 entitlements | ❌ 不枚举 |
+
+附带实测结论：
+
+- **App Group 容器创建需要 profile**：即使主应用带 groups entitlement 且为
+  真实团队签名，无 profile 时 `~/Library/Group Containers/<group>` 创建仍被
+  系统拒绝（EPERM），快照回退到 `~/Library/Application Support/com.syn.todolite/widget/`；
+- profile 免费账号仅能经 Xcode 工程（自动签名）生成，本仓库无 Xcode 工程；
+- 分发包（CI dmg / brew）不含小组件扩展（嵌入脚本不在 CI 流程中）；
+- 恢复路径 = Developer Program（Developer ID + 公证 + App Group profile）后，
+  在 `TodoLiteWidget.entitlements` 恢复标准形态（沙盒 + groups，文件内有注释），
+  Swift 读取代码按 容器 → 标准路径 → 回退 排序，无需改代码；
 - 刷新为 timeline 兜底（≤15 分钟），添加/移除小组件或等待兜底即可看到最新数据。
 
 ## 5. Android AppWidget 施工清单（后续任务）

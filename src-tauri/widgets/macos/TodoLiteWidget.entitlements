@@ -2,14 +2,19 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- 当前发布形态（个人开发签名路线）：无沙盒、无 entitlements。
-	     原因：App Groups 容器的创建除签名外还需要 provisioning profile
-	     （免费账号只能经 Xcode 工程自动生成，本仓库无 Xcode 工程），
-	     因此扩展以「开发证书签名 + 无沙盒」形态运行，直接读主应用
-	     App Data/widget/ 回退路径的快照。
-	     未来接 Xcode 工程做正式分发时，恢复以下标准形态即可：
-	     com.apple.security.app-sandbox = true
-	     com.apple.security.application-groups = [group.com.syn.todolite]
-	     （读取代码已按 容器 → 标准路径 → 回退 排序，两种形态均兼容。） -->
+	<!-- 最终结论（2026-10 实测）：小组件被画廊枚举需要完整系统身份——
+	     开发者签名 + provisioning profile（含 App Group）+ 公证链。
+	     以下四种形态均已实测被 WidgetKit 在枚举阶段过滤（画廊不可见）：
+	       1. ad-hoc + 空 entitlements
+	       2. ad-hoc + 沙盒 + application-groups（无 profile）
+	       3. Apple Development 签名 + 沙盒 + application-groups（无 profile）
+	       4. Apple Development 签名 + 无沙盒 + 空 entitlements
+	     profile 免费账号仅能经 Xcode 工程自动生成（本仓库无工程），
+	     因此小组件定位为「本地构建可选功能」，分发包（CI/brew）不含。
+	     正式启用路径 = Developer Program：Developer ID 签名 + 公证
+	     + App Group profile，届时恢复标准形态：
+	       com.apple.security.app-sandbox = true
+	       com.apple.security.application-groups = [group.com.syn.todolite]
+	     Swift 读取代码已按 容器 → 标准路径 → 回退 排序，形态切换无需改代码。 -->
 </dict>
 </plist>
