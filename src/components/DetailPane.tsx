@@ -8,6 +8,7 @@ import { useUiStore } from "@/stores/ui";
 import { cn } from "@/lib/cn";
 import { formatRelativeTime } from "@/lib/format";
 import { Checkbox } from "./Checkbox";
+import { DatePicker } from "./DatePicker";
 
 const PRIORITY_META: Array<{ value: Priority; label: string; cls: string }> = [
   { value: 0, label: "无", cls: "text-ink2" },
@@ -131,27 +132,15 @@ export function DetailPane() {
                 "rounded-lg px-2.5 py-1 text-xs transition-colors",
                 task.dueDate === q.value
                   ? "bg-accent-soft font-medium text-accent"
-                  : "bg-panel2 text-ink2 hover:text-ink",
+                  : "bg-bg text-ink2 hover:text-ink",
               )}
             >
               {q.label}
             </button>
           ))}
-          {task.dueDate && (
-            <button
-              type="button"
-              onClick={() => patch({ dueDate: undefined })}
-              className="rounded-lg px-2 py-1 text-xs text-ink3 transition-colors hover:text-danger"
-            >
-              清除
-            </button>
-          )}
-          <input
-            type="date"
-            value={task.dueDate ?? ""}
-            onChange={(e) => patch({ dueDate: e.target.value || undefined })}
-            className={cn(fieldCls, "ml-auto w-36 py-1")}
-          />
+        </div>
+        <div className="mt-2">
+          <DatePicker value={task.dueDate} onChange={(v) => patch({ dueDate: v })} />
         </div>
       </section>
 

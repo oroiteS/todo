@@ -69,3 +69,29 @@ export function formatDue(due: string, today: string = todayStr()): string {
 export function mondayBasedDow(d: Date): number {
   return (d.getDay() + 6) % 7;
 }
+
+// ---------- 日历网格 ----------
+
+export interface CalendarCell {
+  /** "yyyy-MM-dd" */
+  date: string;
+  /** 是否属于目标月份（前后月补位为 false） */
+  inMonth: boolean;
+}
+
+/**
+ * 生成某月日历网格：6 行 × 7 列，周日开头（与中文日历习惯一致），
+ * 前后月日期补位。纯函数，供 DatePicker 渲染与单测。
+ */
+export function getMonthGrid(year: number, month: number): CalendarCell[][] {
+  const firstDow = new Date(year, month, 1).getDay(); // 0=周日
+  const start = new Date(year, month, 1 - firstDow);
+  const cells: CalendarCell[] = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    cells.push({ date: toDateStr(d), inMonth: d.getMonth() === month });
+  }
+  const rows: CalendarCell[][] = [];
+  for (let r = 0; r < 6; r++) rows.push(cells.slice(r * 7, r * 7 + 7));
+  return rows;
+}

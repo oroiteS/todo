@@ -7,7 +7,8 @@ import {
 } from "react";
 import { cn } from "@/lib/cn";
 
-function useClickOutside(onOutside: () => void) {
+/** 点击外部 / Esc 时回调（供弹出层复用） */
+export function useClickOutside(onOutside: () => void) {
   const ref = useRef<HTMLDivElement>(null);
   const cb = useCallback(onOutside, [onOutside]);
   useEffect(() => {

@@ -3,6 +3,7 @@ import {
   addDays,
   diffDays,
   formatDue,
+  getMonthGrid,
   isOverdue,
   isWithinNext7Days,
   mondayBasedDow,
@@ -50,5 +51,21 @@ describe("dates", () => {
     expect(formatDue("2027-03-01", TODAY)).toBe("2027年3月1日");
     expect(formatDue("2026-01-13", TODAY)).toBe("昨天到期");
     expect(formatDue("2026-01-10", TODAY)).toBe("逾期 4 天");
+  });
+
+  it("getMonthGrid 生成 6×7 网格、周日开头、前后月补位", () => {
+    const grid = getMonthGrid(2026, 0); // 2026年1月：1月1日周四
+    expect(grid).toHaveLength(6);
+    expect(grid[0]).toHaveLength(7);
+    // 首格回填到上一年的 12月28日（周日）
+    expect(grid[0][0].date).toBe("2025-12-28");
+    expect(grid[0][0].inMonth).toBe(false);
+    // 周四位置是 1月1日
+    expect(grid[0][4].date).toBe("2026-01-01");
+    expect(grid[0][4].inMonth).toBe(true);
+    // 当月 31 天完整出现且仅出现一次
+    const inMonth = grid.flat().filter((c) => c.inMonth);
+    expect(inMonth).toHaveLength(31);
+    expect(new Set(inMonth.map((c) => c.date)).size).toBe(31);
   });
 });

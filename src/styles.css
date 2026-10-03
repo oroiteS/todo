@@ -127,18 +127,6 @@ select {
   background: transparent;
 }
 
-input[type="date"] {
-  -webkit-appearance: none;
-  appearance: none;
-}
-input[type="date"]::-webkit-calendar-picker-indicator {
-  opacity: 0.55;
-  cursor: pointer;
-}
-.dark input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-}
-
 /* ---------- 动效 ---------- */
 @keyframes row-in {
   from {
