@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TodoLite 小组件配色（深色）：与 src/styles.css .dark 设计令牌一一对应。
+     用静态 -night 资源适配深色（小米等 ROM 不支持 RemoteViews 代码动态换色）。 -->
+<resources>
+    <!-- panel: #151517 -->
+    <color name="todolite_widget_bg">#FF151517</color>
+    <!-- ink: #f4f4f5 -->
+    <color name="todolite_widget_ink">#FFF4F4F5</color>
+    <!-- ink3: #5c5c66 -->
+    <color name="todolite_widget_dot_today">#FF5C5C66</color>
+    <!-- ink2: #a4a4af -->
+    <color name="todolite_widget_ink2">#FFA4A4AF</color>
+    <!-- danger: #f87171 -->
+    <color name="todolite_widget_danger">#FFF87171</color>
+    <!-- warn: #fb923c -->
+    <color name="todolite_widget_warn">#FFFB923C</color>
+</resources>

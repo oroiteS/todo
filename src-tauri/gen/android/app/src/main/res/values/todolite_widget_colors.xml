@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TodoLite 小组件配色（浅色）：与 src/styles.css 设计令牌一一对应 -->
+<resources>
+    <!-- panel: #ffffff -->
+    <color name="todolite_widget_bg">#FFFFFFFF</color>
+    <!-- ink: #18181b -->
+    <color name="todolite_widget_ink">#FF18181B</color>
+    <!-- ink3: #9c9ca6（今日任务圆点） -->
+    <color name="todolite_widget_dot_today">#FF9C9CA6</color>
+    <!-- ink2: #6b6b74（次要文字） -->
+    <color name="todolite_widget_ink2">#FF6B6B74</color>
+    <!-- danger: #dc2626（逾期） -->
+    <color name="todolite_widget_danger">#FFDC2626</color>
+    <!-- warn: #ea580c（高优先级） -->
+    <color name="todolite_widget_warn">#FFEA580C</color>
+</resources>

@@ -1,7 +1,7 @@
 # 小组件适配指南
 
 数据通道（应用 → 快照文件）在 v1 打通；**macOS WidgetKit 小组件已在 v1.1 实现**，
-Android（AppWidget）按第 5 节清单待实现。
+**Android（AppWidget）已在 v1.2 实现**（见第 5 节）。
 
 ## 1. 数据流总览
 
@@ -51,7 +51,7 @@ flowchart LR
 | 平台 | 路径 | 说明 |
 |---|---|---|
 | macOS | `~/Library/Group Containers/group.com.syn.todolite/widget-snapshot.json` | 目录不存在时主应用会直接创建（主应用非沙盒）；创建失败才回退 App Data `widget/` |
-| Android | 应用私有目录 `widget/widget-snapshot.json`（`files/widget/`） | AppWidget 与主应用同进程不同渲染管线，可直接读 |
+| Android | 应用私有目录 `widget/widget-snapshot.json`。**实际落点是 `dataDir/widget/`**（Tauri `app_data_dir()` 在 Android 解析为 `activity.dataDir`，即 `/data/user/0/<pkg>/widget/`），AppWidget Provider 读取时对 `dataDir/widget/`、`filesDir/widget/`、外部存储三处按序探测 | AppWidget 与主应用同进程（渲染在宿主进程），Provider 可直接读私有目录 |
 | Windows/Linux | 无（命令返回 false） | Windows 11 小组件无第三方 API，接口保留 |
 
 ## 4. macOS WidgetKit 小组件（✅ 已实现）
@@ -122,20 +122,42 @@ open src-tauri/target/release/bundle/macos/TodoLite.app
   Swift 读取代码按 容器 → 标准路径 → 回退 排序，无需改代码；
 - 刷新为 timeline 兜底（≤15 分钟），添加/移除小组件或等待兜底即可看到最新数据。
 
-## 5. Android AppWidget 施工清单（后续任务）
+## 5. Android AppWidget 小组件（✅ v1.2 已实现）
 
-1. `src-tauri/gen/android/app/src/main/` 下新增
-   `res/xml/todolite_widget_info.xml`（`updatePeriodMillis=1800000` 半小时兜底）；
-2. 新增 `AppWidgetProvider`（Kotlin）：`onUpdate` 中读取
-   `filesDir/widget/widget-snapshot.json`，用 RemoteViews 渲染：
-   - 布局建议：`LinearLayout` 竖排，标题行「今天 · N」，下面至多 3 条任务标题；
-   - 点击任意条目打开主 Activity（`PendingIntent`）；
-3. `AndroidManifest.xml` 注册 receiver 与 meta-data；
-4. 若使用 Jetpack Glance 替代 RemoteViews：`GlanceAppWidget` 的
-   `provideGlance` 中读同一快照文件即可；
-5. 主 app 数据变更后如需立即刷新：Tauri 侧写快照后发一个
-   `AppWidgetManager` 广播（Kotlin 插件桥接，预留）；
-   依赖系统半小时轮询也可接受（快照永远是最新的）。
+实现走**标准 AppWidget + RemoteViews**（未用 Glance）：内容为「今日待办 + 高优先级任务」，
+与 macOS 小组件同一快照通道。无任何签名/厂商认证要求，自签名 APK 即可用。
+
+### 5.1 文件清单（均在 `src-tauri/gen/android/app/src/main/`）
+
+| 文件 | 作用 |
+|---|---|
+| `java/com/syn/todolite/TodoliteWidgetProvider.kt` | AppWidgetProvider：读快照 → RemoteViews 渲染；逾期（红点）→ 今日（灰点）→ 高优（橙点）去重后至多 4 行；标题「今天 · N」+ 红色「逾期 K」后缀 + 橙色「❗ M」徽标；空态文案；点击任意位置打开主应用 |
+| `res/xml/todolite_widget_info.xml` | provider 信息：4x2（`targetCellWidth/Height`），`updatePeriodMillis=1800000` 半小时兜底，`previewLayout` 用真布局做预览 |
+| `res/layout/todolite_widget.xml` | 布局：根布局 `@android:id/background` + 圆角背景（系统按该 ID 统一裁切圆角） |
+| `res/drawable/todolite_widget_bg.xml` | 16dp 圆角背景（兼容旧版本/圆角识别失败场景） |
+| `res/values|values-night/todolite_widget_colors.xml` | 配色取自 `src/styles.css` 设计令牌（panel/ink/ink2/ink3/danger/warn）；**深色用静态 `-night` 资源**（小米等 ROM 不支持 RemoteViews 代码动态换色） |
+| `res/values/strings.xml` | 小组件文案（描述/标题前缀/逾期后缀/徽标/空态/无快照引导） |
+| `AndroidManifest.xml` | receiver（`APPWIDGET_UPDATE`，`exported=true`）+ `android.appwidget.provider` meta-data |
+
+### 5.2 行为与限制
+
+- **刷新时机**：主应用写快照后不发广播（Kotlin 桥接暂缺，见施工清单遗留项），依赖
+  系统 30 分钟轮询 + 桌面重建（添加组件、重启桌面等）重读。快照永远是最新写入，
+  组件展示最多滞后半小时。后续可让 Rust 写完快照后触发一次
+  `AppWidgetManager.actionAppWidgetUpdate` 广播实现即时刷新（预留）。
+- **渲染约束**：RemoteViews 不支持动态增删 View，任务行是布局里固定的 4 个
+  TextView（无任务时隐藏）；行内容用 SpannableString 给「●」圆点上色。
+- **点击**：整卡 `PendingIntent.getActivity` 直达 MainActivity（Android 12+ 禁 trampoline）。
+- **快照缺失/损坏**：显示「打开 TodoLite 同步小组件数据」引导，不崩。
+- **验证**：`ANDROID_HOME=$HOME/Library/Android/sdk ./gradlew :app:compileDebugKotlin`
+  （在 `src-tauri/gen/android/` 下执行，Kotlin 编译不触发 Rust 交叉编译）。
+
+### 5.3 后续可选增强（原施工清单遗留项）
+
+1. Kotlin 插件桥：Rust 写完快照后发 `AppWidgetManager` 广播实现秒级刷新；
+2. `ListView` + `RemoteViewsFactory` 展示更多条目；
+3. 按任务条目区分点击目标（打开应用并定位到对应任务）；
+4. 如迁移 Glance：`GlanceAppWidget.provideGlance` 读同一快照文件即可。
 
 ## 6. 接口契约（不要破坏）
 

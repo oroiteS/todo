@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 小组件背景：圆角矩形 + 主题面板色。
+     Android 12+ 宿主还会按 system_app_widget_background_radius 再裁切一层，
+     自带 16dp 圆角用于兼容旧版本与识别失败的场景。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/todolite_widget_bg" />
+    <corners android:radius="16dp" />
+</shape>
