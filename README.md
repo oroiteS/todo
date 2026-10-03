@@ -31,6 +31,21 @@
 | 同步 | WebDAV（`@tauri-apps/plugin-http`，ETag 乐观锁） |
 | 测试 | Vitest（领域层纯函数单测） |
 
+## 安装（Homebrew · macOS）
+
+仓库根目录的 `Casks/` 让本仓库可以直接作为 Homebrew tap 使用，无需额外建仓库：
+
+```bash
+brew install --cask oroiteS/todo/todolite
+```
+
+该命令会自动 tap 本仓库并安装 Release 中的 dmg（Apple Silicon / Intel 自动选择对应架构）。
+之后跟随新版本发布即可：
+
+```bash
+brew update && brew upgrade
+```
+
 ## 本地开发（macOS / Windows）
 
 ```bash
@@ -99,6 +114,7 @@ src-tauri/            Tauri 壳
 ├── src/commands.rs   数据文件原子读写+备份、凭据、平台信息
 ├── src/widget/       ★ 分平台快照落点（cfg）
 └── gen/android/      Android Studio 工程（已入库）
+Casks/                Homebrew tap（macOS cask，随 Release 自动升级）
 .github/workflows/    三端构建 CI
 ```
 
