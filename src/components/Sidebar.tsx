@@ -238,20 +238,30 @@ export function Sidebar() {
               />
             ))}
             {adding && (
-              <div className="flex items-center gap-2 rounded-lg bg-panel2 px-2.5 py-1.5">
+              // form 隐式提交：安卓输入法的回车/完成键不会总发 keydown Enter，
+              // 由 submit 事件兜底（桌面回车同样触发）
+              <form
+                className="flex items-center gap-2 rounded-lg bg-panel2 px-2.5 py-1.5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  submitNew();
+                }}
+              >
                 <input
                   autoFocus
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") submitNew();
                     if (e.key === "Escape") setAdding(false);
                   }}
                   onBlur={submitNew}
+                  enterKeyHint="done"
+                  autoComplete="off"
+                  spellCheck={false}
                   placeholder="列表名称，回车保存"
                   className="w-full bg-transparent text-sm outline-none placeholder:text-ink3"
                 />
-              </div>
+              </form>
             )}
             {!lists.length && !adding && (
               <p className="px-2.5 py-1 text-[12px] leading-relaxed text-ink3">
@@ -302,20 +312,29 @@ function ListRow(p: ListRowProps) {
   const setView = useUiStore((s) => s.setView);
   if (p.renaming) {
     return (
-      <div className="flex items-center gap-2 rounded-lg bg-panel2 px-2.5 py-1.5">
+      // form 隐式提交：兼容安卓输入法（同「新建列表」）
+      <form
+        className="flex items-center gap-2 rounded-lg bg-panel2 px-2.5 py-1.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          p.onSubmitRename();
+        }}
+      >
         <span className="text-[13px]">{p.list.emoji}</span>
         <input
           autoFocus
           value={p.renameText}
           onChange={(e) => p.onRenameText(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") p.onSubmitRename();
             if (e.key === "Escape") p.onCancelRename();
           }}
           onBlur={p.onSubmitRename}
+          enterKeyHint="done"
+          autoComplete="off"
+          spellCheck={false}
           className="w-full bg-transparent text-sm outline-none"
         />
-      </div>
+      </form>
     );
   }
 
