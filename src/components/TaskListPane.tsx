@@ -269,7 +269,7 @@ export function TaskListPane() {
             >
               <ChevronDown
                 size={13}
-                className={cn("transition-transform duration-150", !showCompleted && "-rotate-90")}
+                className={cn("transition-transform duration-150", !showCompleted && "[transform:rotate(-90deg)]")}
               />
               已完成 · {done.length}
             </button>

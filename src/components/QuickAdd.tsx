@@ -91,7 +91,7 @@ export function QuickAdd({ currentListId }: { currentListId?: string }) {
         className={cn(
           "flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all",
           canSubmit
-            ? "bg-accent text-white shadow-sm hover:brightness-110 active:scale-90"
+            ? "bg-accent text-white shadow-sm hover:brightness-110 active:[transform:scale(0.9)]"
             : "bg-panel2 text-ink3",
         )}
       >

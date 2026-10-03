@@ -138,7 +138,7 @@ function AppearanceSection() {
                 data-selected={accent === name}
                 onClick={() => updateSettings({ accent: name })}
                 className={cn(
-                  "h-5 w-5 shrink-0 rounded-full transition-transform hover:scale-110",
+                  "h-5 w-5 shrink-0 rounded-full transition-transform hover:[transform:scale(1.1)]",
                   accent === name &&
                     "ring-2 ring-ink/30 ring-offset-2 ring-offset-panel",
                 )}
@@ -169,7 +169,7 @@ function Switch({ checked, onChange }: { checked: boolean; onChange(v: boolean):
       <span
         className={cn(
           "block h-4 w-4 rounded-full bg-white shadow transition-transform",
-          checked && "translate-x-4",
+          checked && "[transform:translateX(1rem)]",
         )}
       />
     </button>

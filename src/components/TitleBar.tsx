@@ -47,7 +47,7 @@ export function TitleBar() {
         <div className="relative w-full max-w-md">
           <Search
             size={14}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink3"
+            className="pointer-events-none absolute left-3 top-1/2 [transform:translateY(-50%)] text-ink3"
           />
           <input
             id="global-search"
@@ -56,7 +56,7 @@ export function TitleBar() {
             placeholder="搜索任务"
             className="h-8 w-full rounded-lg border border-transparent bg-panel2/70 pl-8.5 pr-12 text-[13px] outline-none transition-colors placeholder:text-ink3 focus:border-accent/40 focus:bg-panel"
           />
-          <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-line px-1 py-px text-[10px] leading-none text-ink3 md:block">
+          <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden [transform:translateY(-50%)] rounded border border-line px-1 py-px text-[10px] leading-none text-ink3 md:block">
             ⌘K
           </kbd>
         </div>

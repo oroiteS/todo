@@ -127,8 +127,13 @@ export function Sidebar() {
       )}
       <aside
         className={cn(
-          "fixed bottom-0 left-0 top-0 z-40 flex w-72 shrink-0 flex-col border-r border-line/60 bg-panel/95 backdrop-blur-2xl transition-transform duration-200 md:static md:z-auto md:flex md:translate-x-0 md:bg-[var(--sidebar)]",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full",
+          // 抽屉显隐用原生 transform:translateX 而非 TW 的 translate-x-* 工具类：
+          // Tailwind v4 会把后者编译成独立的 CSS translate 属性（Chromium 104+ 才支持），
+          // 老 WebView（如 BlueStacks）不认识 → 抽屉永远显示且"关不掉"。
+          "fixed bottom-0 left-0 top-0 z-40 flex w-72 shrink-0 flex-col border-r border-line/60 bg-panel/95 backdrop-blur-2xl transition-transform duration-200 md:static md:z-auto md:flex md:bg-[var(--sidebar)] md:[transform:translateX(0)]",
+          sidebarOpen
+            ? "[transform:translateX(0)]"
+            : "[transform:translateX(-100%)]",
         )}
       >
         {/* 品牌区（macOS 红绿灯落在此处上方） */}
@@ -490,7 +495,7 @@ function AppearancePicker({
               aria-label={`颜色 ${c}`}
               onClick={() => onPickColor(c)}
               className={cn(
-                "h-6 w-6 rounded-full transition-transform hover:scale-110",
+                "h-6 w-6 rounded-full transition-transform hover:[transform:scale(1.1)]",
                 list.color === c && "ring-2 ring-ink/40 ring-offset-2 ring-offset-panel",
               )}
               style={{ background: c }}
