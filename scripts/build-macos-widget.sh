@@ -46,8 +46,18 @@ if [[ -n "${APP_VERSION}" ]]; then
 fi
 cp "$BUILD_DIR/TodoLiteWidget" "$BUILD_DIR/TodoLiteWidget.appex/Contents/MacOS/TodoLiteWidget"
 
-echo "==> 签名 extension（ad-hoc + App Groups entitlements）…"
-codesign --force --sign - --timestamp=none \
+echo "==> 解析签名身份…"
+# 优先 Apple Development 证书（App Groups 沙盒形态必需）；
+# 无证书环境回退 ad-hoc（扩展 entitlements 需为空形态，见 entitlements 文件内注释）
+if [[ -z "${SIGN_IDENTITY:-}" ]]; then
+  SIGN_IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null \
+    | awk '/Apple Development/{print $2; exit}')"
+fi
+[[ -n "$SIGN_IDENTITY" ]] || SIGN_IDENTITY="-"
+echo "    使用身份: $SIGN_IDENTITY"
+
+echo "==> 签名 extension…"
+codesign --force --sign "$SIGN_IDENTITY" --timestamp=none \
   --entitlements "$SRC_DIR/TodoLiteWidget.entitlements" \
   "$BUILD_DIR/TodoLiteWidget.appex"
 
@@ -72,7 +82,7 @@ rm -rf "$APP_PATH/Contents/PlugIns/TodoLiteWidget.appex"
 cp -R "$BUILD_DIR/TodoLiteWidget.appex" "$APP_PATH/Contents/PlugIns/"
 
 echo "==> 重签主应用（注入 App Groups entitlements，不用 --deep 以免覆盖 extension 签名）…"
-codesign --force --sign - --timestamp=none \
+codesign --force --sign "$SIGN_IDENTITY" --timestamp=none \
   --entitlements "$SRC_DIR/TodoLiteApp.entitlements" \
   "$APP_PATH"
 

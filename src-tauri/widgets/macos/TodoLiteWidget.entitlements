@@ -2,12 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- 刻意保持为空：ad-hoc 签名无法为 application-groups 提供 provisioning，
-	     而声明了无法兑现的 entitlement 会导致 WidgetKit 在枚举阶段丢弃扩展
-	     （小组件画廊不显示）。无沙盒 + 无 entitlement 的最小形态可正常枚举，
-	     数据经主应用回退路径（App Data/widget/）读取。
-	     正式签名路线：恢复 com.apple.security.app-sandbox = true +
-	     com.apple.security.application-groups = [group.com.syn.todolite]，
-	     并用开发者身份签名（见 docs/widget-adaptation.md §4.5）。 -->
+	<!-- 当前发布形态（个人开发签名路线）：无沙盒、无 entitlements。
+	     原因：App Groups 容器的创建除签名外还需要 provisioning profile
+	     （免费账号只能经 Xcode 工程自动生成，本仓库无 Xcode 工程），
+	     因此扩展以「开发证书签名 + 无沙盒」形态运行，直接读主应用
+	     App Data/widget/ 回退路径的快照。
+	     未来接 Xcode 工程做正式分发时，恢复以下标准形态即可：
+	     com.apple.security.app-sandbox = true
+	     com.apple.security.application-groups = [group.com.syn.todolite]
+	     （读取代码已按 容器 → 标准路径 → 回退 排序，两种形态均兼容。） -->
 </dict>
 </plist>
