@@ -18,7 +18,7 @@ val tauriProperties = Properties().apply {
 // Android 只有在 versionCode >= 已安装版本时才允许覆盖安装。
 // 这里显式把 semver 映射为整数(major*1_000_000 + minor*1_000 + patch),
 // 只要不降低 tauri.conf.json 里的 version,versionCode 就严格递增。
-val androidVersionName: String = tauriProperties.getProperty("tauri.android.versionName", "0.1.1")
+val androidVersionName: String = tauriProperties.getProperty("tauri.android.versionName", "0.2.1")
 val androidVersionCode: Int = run {
     val match = Regex("(\\d+)\\.(\\d+)\\.(\\d+)").find(androidVersionName)
     if (match != null) {
