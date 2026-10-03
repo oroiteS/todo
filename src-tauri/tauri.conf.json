@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "TodoLite",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "com.syn.todolite",
   "build": {
     "beforeDevCommand": "pnpm dev",
