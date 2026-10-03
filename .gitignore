@@ -10,3 +10,13 @@ src-tauri/gen/schemas
 # system
 .DS_Store
 *.local
+
+# android 发布签名密钥——绝不入库(泄露 = 所有用户的更新可被伪造)
+*.jks
+*.keystore
+src-tauri/gen/android/app/keystore.properties
+
+# tauri android 构建期生成物(CLI 每次 build 都会重写)
+src-tauri/gen/android/app/tauri.properties
+src-tauri/gen/android/app/tauri.build.gradle.kts
+

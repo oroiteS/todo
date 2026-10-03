@@ -66,10 +66,25 @@ rustup target add aarch64-linux-android
 pnpm tauri android init   # 已初始化则跳过
 pnpm tauri android build --apk --debug --target aarch64
 # 产物：src-tauri/gen/android/app/build/outputs/apk/**/app-*.apk
+
+# 发布构建（固定密钥签名，可直接覆盖安装旧版）：
+pnpm tauri android build --apk --target aarch64
 ```
 
 没有 Android 环境也可以直接用 GitHub Actions：推送 `v*` tag（或手动
 workflow_dispatch）即可在 Release 页下载三端安装包。
+
+## 更新与签名（兼容式升级）
+
+所有正式版本均可**直接覆盖安装**——不卸载旧版、数据保留。机制、签名密钥生成
+（一次性）、GitHub Secrets 配置与发版红线见
+[docs/compatible-updates.md](docs/compatible-updates.md)。
+
+Android 端首次需配置发布密钥（之后所有版本自动复用）：
+
+```bash
+./scripts/gen-android-keystore.sh   # 生成密钥，按输出提示配置 GitHub Secrets 即可
+```
 
 ## 同步配置
 
@@ -124,7 +139,7 @@ Casks/                Homebrew tap（macOS cask，随 Release 自动升级）
 - [ ] Android 小组件（AppWidget / Glance）—— 接口已预留
 - [ ] 任务提醒系统通知
 - [ ] 子任务 / 重复任务 / 标签
-- [ ] macOS / Windows 正式签名与公证
+- [ ] macOS / Windows 正式签名与公证（CI 已预留，配置 Apple secrets 即自动生效）
 
 ## License
 
