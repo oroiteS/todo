@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Cloud,
@@ -96,17 +96,25 @@ function AppearanceSection() {
   const accent = useDataStore((s) => s.db.settings.accent);
   const updateSettings = useDataStore((s) => s.updateSettings);
 
+  // 选中色变化时,把该色点滚到可见区域(色板为横向滚动容器)
+  const accentScrollerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    accentScrollerRef.current
+      ?.querySelector('[data-selected="true"]')
+      ?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+  }, [accent]);
+
   return (
     <Card icon={<Palette size={14} />} title="外观">
-      <div className="flex items-center gap-4">
-        <div className="flex flex-1 rounded-xl bg-panel2 p-1">
+      <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 rounded-xl bg-panel2 p-1">
           {THEMES.map((t) => (
             <button
               key={t.value}
               type="button"
               onClick={() => updateSettings({ theme: t.value })}
               className={cn(
-                "flex-1 rounded-lg py-1.5 text-[13px] transition-all",
+                "flex-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-[13px] transition-all",
                 theme === t.value
                   ? "bg-panel font-medium shadow-sm"
                   : "text-ink2 hover:text-ink",
@@ -116,21 +124,28 @@ function AppearanceSection() {
             </button>
           ))}
         </div>
-        <div className="flex gap-1.5">
-          {(Object.keys(ACCENTS) as AccentName[]).map((name) => (
-            <button
-              key={name}
-              type="button"
-              aria-label={`强调色 ${name}`}
-              onClick={() => updateSettings({ accent: name })}
-              className={cn(
-                "h-5 w-5 rounded-full transition-transform hover:scale-110",
-                accent === name &&
-                  "ring-2 ring-ink/30 ring-offset-2 ring-offset-panel",
-              )}
-              style={{ background: ACCENTS[name] }}
-            />
-          ))}
+        {/* 色板:横向滚动,同屏约 4 个,把宽度留给左侧主题切换 */}
+        <div
+          ref={accentScrollerRef}
+          className="w-[106px] shrink-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        >
+          <div className="flex w-max gap-1.5 p-1">
+            {(Object.keys(ACCENTS) as AccentName[]).map((name) => (
+              <button
+                key={name}
+                type="button"
+                aria-label={`强调色 ${name}`}
+                data-selected={accent === name}
+                onClick={() => updateSettings({ accent: name })}
+                className={cn(
+                  "h-5 w-5 shrink-0 rounded-full transition-transform hover:scale-110",
+                  accent === name &&
+                    "ring-2 ring-ink/30 ring-offset-2 ring-offset-panel",
+                )}
+                style={{ background: ACCENTS[name] }}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </Card>
