@@ -39,6 +39,12 @@ brew install --cask oroiteS/tap/todolite
 
 该命令自动 tap [oroiteS/homebrew-tap](https://github.com/oroiteS/homebrew-tap)
 并安装 Release 中的 dmg（Apple Silicon / Intel 自动选择对应架构）。
+
+> [!NOTE]
+> 应用尚未做 Apple 签名与公证（见 Roadmap），首次打开若提示「已损坏」，
+> 运行 `xattr -dr com.apple.quarantine /Applications/TodoLite.app`，
+> 或安装时带 `--no-quarantine`。
+
 cask 由 tap 仓库的定时 workflow 跟随最新 Release 自动更新 `version` 与 `sha256`，
 之后跟随新版本发布即可：
 
