@@ -12,11 +12,9 @@ import { useClickOutside } from "./Dropdown";
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 const MONTH_LABELS = Array.from({ length: 12 }, (_, i) => `${i + 1}月`);
 
-/** 年份可选范围：动态锚定当前年份（不随时间流逝过期）
- *  例如 2026 年 → 1926 ~ 2136（往前 100 年，往后 110 年） */
-const NOW_YEAR = new Date().getFullYear();
-const MIN_YEAR = NOW_YEAR - 100;
-const MAX_YEAR = NOW_YEAR + 110;
+/** 年份可选范围：过去定死 2000 年；未来到当前年份 +10（动态） */
+const MIN_YEAR = 2000;
+const MAX_YEAR = new Date().getFullYear() + 10;
 
 function formatFull(dateStr: string): string {
   const d = parseDate(dateStr);
@@ -55,13 +53,12 @@ export function DatePicker({ value, onChange }: Props) {
 
   const grid = useMemo(() => getMonthGrid(viewYear, viewMonth), [viewYear, viewMonth]);
 
-  /** 年份列表：2000 年起，到当前视图年份 +4（随导航自动延展） */
+  /** 年份列表：完整范围 2000 ~ 今年+10，可一路滑到底 */
   const years = useMemo(() => {
-    const end = Math.min(MAX_YEAR, viewYear + 4);
     const list: number[] = [];
-    for (let y = MIN_YEAR; y <= end; y++) list.push(y);
+    for (let y = MIN_YEAR; y <= MAX_YEAR; y++) list.push(y);
     return list;
-  }, [viewYear]);
+  }, []);
 
   // 年月面板打开 / 切换年份时，把当前年份滚动到列表中央
   const yearListRef = useRef<HTMLDivElement>(null);
@@ -77,7 +74,8 @@ export function DatePicker({ value, onChange }: Props) {
 
   const shiftMonth = (delta: number) => {
     const d = new Date(viewYear, viewMonth + delta, 1);
-    setViewYear(d.getFullYear());
+    const y = Math.min(MAX_YEAR, Math.max(MIN_YEAR, d.getFullYear()));
+    setViewYear(y);
     setViewMonth(d.getMonth());
   };
 

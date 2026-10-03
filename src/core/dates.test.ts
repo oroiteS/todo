@@ -68,4 +68,14 @@ describe("dates", () => {
     expect(inMonth).toHaveLength(31);
     expect(new Set(inMonth.map((c) => c.date)).size).toBe(31);
   });
+
+  it("getMonthGrid 实时计算闰年 2 月（含世纪年规则），非存储表", () => {
+    const febDays = (year: number) =>
+      getMonthGrid(year, 1).flat().filter((c) => c.inMonth).length;
+    expect(febDays(2024)).toBe(29); // 普通闰年
+    expect(febDays(2023)).toBe(28); // 平年
+    expect(febDays(2000)).toBe(29); // 世纪闰年（能被 400 整除）
+    expect(febDays(1900)).toBe(28); // 世纪平年（能被 100 整除但不能被 400）
+    expect(febDays(2100)).toBe(28); // 同上
+  });
 });
