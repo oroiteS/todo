@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TodoLite 主题配色（深色）：与 src/styles.css .dark 设计令牌对应 -->
+<resources>
+    <!-- bg: #0a0a0b -->
+    <color name="todolite_app_bg">#FF0A0A0B</color>
+</resources>

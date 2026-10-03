@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TodoLite 主题配色（浅色）：与 src/styles.css 设计令牌对应，供窗口背景使用 -->
+<resources>
+    <!-- bg: #f4f4f5 -->
+    <color name="todolite_app_bg">#FFF4F4F5</color>
+</resources>
