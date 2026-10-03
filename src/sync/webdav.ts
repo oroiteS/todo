@@ -1,7 +1,11 @@
-// WebDAV 客户端：基于 @tauri-apps/plugin-http（绕过 WebView CORS，支持自定义方法）。
-// 仅使用同步场景所需的最小操作集：GET / PUT(If-Match) / MKCOL / PROPFIND。
+// WebDAV 同步后端：基于 @tauri-apps/plugin-http（绕过 WebView CORS，支持自定义方法）。
+// 使用最小操作集：GET / PUT(If-Match) / MKCOL / PROPFIND。
 
 import { fetch } from "@tauri-apps/plugin-http";
+import { utf8ToBase64 } from "@/lib/base64";
+import { ConflictError, type SyncBackend } from "./backend";
+
+export const WEBDAV_DATA_FILE = "todolite-data.json";
 
 export interface DavConfig {
   url: string;
@@ -32,16 +36,13 @@ export function fileUrl(cfg: DavConfig, rel: string): string {
   return `${normalizeBaseUrl(cfg.url)}/${dir ? `${dir}/` : ""}${rel}`;
 }
 
-function utf8ToBase64(s: string): string {
-  const bytes = new TextEncoder().encode(s);
-  let bin = "";
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin);
+function utf8ToBase64Auth(s: string): string {
+  return utf8ToBase64(s);
 }
 
 function authHeaders(cfg: DavConfig): Record<string, string> {
   if (!cfg.username && !cfg.password) return {};
-  return { Authorization: `Basic ${utf8ToBase64(`${cfg.username}:${cfg.password}`)}` };
+  return { Authorization: `Basic ${utf8ToBase64Auth(`${cfg.username}:${cfg.password}`)}` };
 }
 
 function timeoutSignal(ms = 20000): AbortSignal | undefined {
@@ -145,4 +146,28 @@ export async function davTest(
   } catch (e) {
     return { ok: false, message: `网络错误：${e instanceof Error ? e.message : String(e)}` };
   }
+}
+
+/** SyncBackend 适配器：把 davGet/davPut 包装为引擎所需接口 */
+export function webdavBackend(cfg: DavConfig): SyncBackend {
+  return {
+    async pull() {
+      const doc = await davGet(cfg, WEBDAV_DATA_FILE);
+      return doc ? { text: doc.text, version: doc.etag } : null;
+    },
+    async prepare() {
+      await davEnsureDirectory(cfg);
+    },
+    async push(text, version) {
+      try {
+        const r = await davPut(cfg, WEBDAV_DATA_FILE, text, version);
+        return { version: r.etag };
+      } catch (e) {
+        if (e instanceof DavError && e.status === 412) {
+          throw new ConflictError("远端数据已被其他设备修改");
+        }
+        throw e;
+      }
+    },
+  };
 }

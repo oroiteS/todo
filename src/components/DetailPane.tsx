@@ -115,7 +115,7 @@ export function DetailPane() {
       />
 
       {/* 到期日 */}
-      <section>
+      <section className="rounded-2xl bg-panel2/50 p-3.5">
         <span className={labelCls}>到期时间</span>
         <div className="flex flex-wrap items-center gap-1.5">
           {[
@@ -156,7 +156,7 @@ export function DetailPane() {
       </section>
 
       {/* 优先级 */}
-      <section>
+      <section className="rounded-2xl bg-panel2/50 p-3.5">
         <span className={labelCls}>优先级</span>
         <div className="flex gap-1.5">
           {PRIORITY_META.map((p) => (
@@ -178,7 +178,7 @@ export function DetailPane() {
       </section>
 
       {/* 所属列表 */}
-      <section>
+      <section className="rounded-2xl bg-panel2/50 p-3.5">
         <span className={labelCls}>所属列表</span>
         <div className="flex items-center gap-2">
           <span
@@ -202,7 +202,7 @@ export function DetailPane() {
       </section>
 
       {/* 备注 */}
-      <section className="flex min-h-24 flex-1 flex-col">
+      <section className="flex min-h-24 flex-1 flex-col rounded-2xl bg-panel2/50 p-3.5">
         <span className={labelCls}>备注</span>
         <AutoTextarea
           value={task.notes ?? ""}

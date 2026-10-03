@@ -17,7 +17,9 @@ export function emptyDatabase(now: Date = new Date()): Database {
     settings: {
       theme: "system",
       accent: "rose",
+      syncBackend: "webdav",
       webdav: null,
+      github: null,
       lastSyncAt: null,
     },
   };
@@ -69,7 +71,9 @@ export function normalizeDatabase(raw: unknown, now: Date = new Date()): Databas
     db.settings = {
       theme: obj.settings.theme ?? "system",
       accent: obj.settings.accent ?? "rose",
+      syncBackend: obj.settings.syncBackend ?? "webdav",
       webdav: obj.settings.webdav ?? null,
+      github: obj.settings.github ?? null,
       lastSyncAt: obj.settings.lastSyncAt ?? null,
     };
   }

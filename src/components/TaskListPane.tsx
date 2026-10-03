@@ -201,14 +201,36 @@ export function TaskListPane() {
       selectTask(selectedTaskId === t.id ? null : t.id),
   });
 
+  const total = active.length + done.length;
+  const progressPill =
+    mode === "normal" && viewExists && total > 0 ? (
+      <div className="flex items-center gap-2 rounded-full border border-line bg-panel/80 py-1.5 pl-2.5 pr-3 shadow-sm">
+        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-panel2">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${(done.length / total) * 100}%`,
+              background: "linear-gradient(90deg,#f97316,var(--accent))",
+            }}
+          />
+        </div>
+        <span className="text-[11px] tabular-nums text-ink2">
+          {done.length}/{total} 已完成
+        </span>
+      </div>
+    ) : null;
+
   return (
     <main className="flex min-w-0 flex-1 flex-col">
-      <header className="flex items-end justify-between px-6 pb-3 pt-5">
-        <div>
-          <h1 className="text-[22px] font-bold tracking-tight">{title}</h1>
+      <header className="flex items-end justify-between gap-3 px-6 pb-3 pt-5">
+        <div className="min-w-0">
+          <h1 className="truncate text-[22px] font-bold tracking-tight">{title}</h1>
           <p className="mt-0.5 text-[13px] text-ink2">{subtitle}</p>
         </div>
-        {headerRight}
+        <div className="flex shrink-0 items-center gap-2">
+          {progressPill}
+          {headerRight}
+        </div>
       </header>
 
       {mode === "normal" && viewExists && <QuickAdd currentListId={currentListId} />}

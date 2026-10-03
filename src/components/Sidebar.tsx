@@ -31,28 +31,41 @@ interface SmartItemProps {
   label: string;
   count: number;
   active: boolean;
+  /** 该视图的主题色（hex），用于图标芯片 */
+  tint: string;
   onClick: () => void;
 }
 
-function SmartItem({ icon: Icon, label, count, active, onClick }: SmartItemProps) {
+function SmartItem({ icon: Icon, label, count, active, tint, onClick }: SmartItemProps) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-sm transition-colors",
+        "group flex w-full items-center gap-2.5 rounded-xl px-2 py-[7px] text-sm transition-all duration-150",
         active
-          ? "bg-accent-soft font-medium text-accent"
-          : "text-ink2 hover:bg-panel2 hover:text-ink",
+          ? "bg-panel font-medium text-ink shadow-sm ring-1 ring-line/70"
+          : "text-ink2 hover:bg-panel2/60 hover:text-ink",
       )}
     >
-      <Icon
-        size={15}
-        className={active ? "text-accent" : "text-ink3 group-hover:text-ink2"}
-      />
+      <span
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg transition-colors"
+        style={{ background: active ? tint : `${tint}24` }}
+      >
+        <Icon
+          size={13}
+          style={{ color: active ? "#ffffff" : tint }}
+          strokeWidth={2.4}
+        />
+      </span>
       <span className="flex-1 truncate text-left">{label}</span>
       {count > 0 && (
-        <span className="text-xs tabular-nums text-ink3 group-hover:text-ink2">
+        <span
+          className={cn(
+            "rounded-md px-1.5 py-px text-[11px] tabular-nums",
+            active ? "bg-panel2 text-ink2" : "text-ink3 group-hover:text-ink2",
+          )}
+        >
           {count}
         </span>
       )}
@@ -113,18 +126,19 @@ export function Sidebar() {
       )}
       <aside
         className={cn(
-          "fixed bottom-0 left-0 top-12 z-40 flex w-72 shrink-0 flex-col border-r border-line bg-panel transition-transform duration-200 md:static md:top-0 md:z-auto md:flex md:translate-x-0",
+          "fixed bottom-0 left-0 top-12 z-40 flex w-72 shrink-0 flex-col border-r border-line/70 bg-panel/70 backdrop-blur-xl transition-transform duration-200 md:static md:top-0 md:z-auto md:flex md:translate-x-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div className="min-h-0 flex-1 overflow-y-auto p-3 pt-4">
           {/* 智能视图 */}
-          <nav className="flex flex-col gap-0.5">
+          <nav className="flex flex-col gap-1">
             <SmartItem
               icon={Sun}
               label="今天"
               count={todayCount}
               active={isSmart("today")}
+              tint="#f59e0b"
               onClick={go({ kind: "smart", id: "today" })}
             />
             <SmartItem
@@ -132,6 +146,7 @@ export function Sidebar() {
               label="计划"
               count={upcomingCount}
               active={isSmart("upcoming")}
+              tint="#0ea5e9"
               onClick={go({ kind: "smart", id: "upcoming" })}
             />
             <SmartItem
@@ -139,6 +154,7 @@ export function Sidebar() {
               label="全部"
               count={allCount}
               active={isSmart("all")}
+              tint="#8b5cf6"
               onClick={go({ kind: "smart", id: "all" })}
             />
             <SmartItem
@@ -146,6 +162,7 @@ export function Sidebar() {
               label="回收站"
               count={trashCount}
               active={view.kind === "trash"}
+              tint="#78716c"
               onClick={go({ kind: "trash" })}
             />
           </nav>
@@ -283,9 +300,9 @@ function ListRow(p: ListRowProps) {
   return (
     <div
       className={cn(
-        "group flex items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-sm transition-colors",
+        "group flex items-center gap-2.5 rounded-xl px-2 py-[7px] text-sm transition-all duration-150",
         p.active
-          ? "bg-panel2 font-medium text-ink shadow-[inset_2px_0_0_var(--accent)]"
+          ? "bg-panel font-medium text-ink shadow-sm ring-1 ring-line/70"
           : "text-ink2 hover:bg-panel2/60 hover:text-ink",
       )}
     >

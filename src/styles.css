@@ -62,6 +62,19 @@ body {
   -webkit-user-select: none;
   user-select: none;
   -webkit-font-smoothing: antialiased;
+  /* 极淡的双色氛围光晕，随强调色变化 */
+  background-image:
+    radial-gradient(
+      1100px 460px at 88% -12%,
+      color-mix(in srgb, var(--accent) 6%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      900px 420px at -8% 108%,
+      color-mix(in srgb, #38bdf8 5%, transparent),
+      transparent 62%
+    );
+  background-attachment: fixed;
 }
 
 input,

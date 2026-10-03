@@ -7,11 +7,13 @@
 import { create } from "zustand";
 import type {
   Database,
+  GitHubSyncConfig,
   ID,
   Priority,
   Settings,
   Task,
   TaskList,
+  SyncBackendKind,
   WebDAVConfig,
 } from "@/core/models";
 import * as ops from "@/core/operations";
@@ -20,6 +22,9 @@ import { getStorage } from "@/storage/adapters";
 import { widgetBridge } from "@/bridge/widget";
 import { applyTheme } from "@/lib/theme";
 import { setSyncHooks, syncNow } from "@/sync/engine";
+import { githubBackend } from "@/sync/github";
+import { webdavBackend } from "@/sync/webdav";
+import { deleteSecret, getSecret } from "@/lib/secrets";
 import { useSyncStore } from "./sync";
 
 interface DataStore {
@@ -51,6 +56,8 @@ interface DataStore {
   deleteList(id: ID): void;
   updateSettings(patch: Partial<Settings>): void;
   setWebDAV(cfg: WebDAVConfig | null): void;
+  setGitHub(cfg: GitHubSyncConfig | null): void;
+  setSyncBackend(kind: SyncBackendKind): void;
   /** 同步结果回写：与当前活数据再合并，绝不触发新一轮自动同步 */
   replaceDatabase(incoming: Database): void;
   importDatabase(raw: unknown): boolean;
@@ -82,8 +89,9 @@ export const useDataStore = create<DataStore>((set, get) => {
     });
   };
   const scheduleAutoSync = () => {
-    const cfg = get().db.settings.webdav;
-    if (!cfg?.autoSync) return;
+    const s = get().db.settings;
+    const active = s.syncBackend === "github" ? s.github : s.webdav;
+    if (!active?.autoSync) return;
     syncTimer = schedule(syncTimer, 2500, () => void get().triggerSync());
   };
 
@@ -203,6 +211,21 @@ export const useDataStore = create<DataStore>((set, get) => {
       }));
     },
 
+    setGitHub(cfg) {
+      mutate((db) => ({
+        ...db,
+        settings: { ...db.settings, github: cfg },
+      }));
+      if (!cfg) void deleteSecret("github");
+    },
+
+    setSyncBackend(kind) {
+      mutate((db) => ({
+        ...db,
+        settings: { ...db.settings, syncBackend: kind },
+      }));
+    },
+
     replaceDatabase(incoming) {
       // 防竞态：同步期间的本地新编辑 updatedAt 更新，合并后胜出
       const { merged } = mergeDatabases(get().db, incoming);
@@ -232,9 +255,33 @@ export const useDataStore = create<DataStore>((set, get) => {
     },
 
     async triggerSync() {
-      const cfg = get().db.settings.webdav;
-      if (!cfg?.url) return;
-      await syncNow({ cfg, local: get().db, applyMerged: (db) => get().replaceDatabase(db) });
+      const s = get().db.settings;
+      const applyMerged = (db: Database) => get().replaceDatabase(db);
+      if (s.syncBackend === "github") {
+        const cfg = s.github;
+        if (!cfg?.repo) {
+          useSyncStore.getState().update({ status: "error", message: "未配置 GitHub 仓库" });
+          return;
+        }
+        const token = (await getSecret("github")) ?? "";
+        await syncNow({
+          backend: githubBackend(cfg, token),
+          local: get().db,
+          applyMerged,
+        });
+      } else {
+        const cfg = s.webdav;
+        if (!cfg?.url) {
+          useSyncStore.getState().update({ status: "error", message: "未配置 WebDAV" });
+          return;
+        }
+        const password = (await getSecret("webdav")) ?? "";
+        await syncNow({
+          backend: webdavBackend({ ...cfg, password }),
+          local: get().db,
+          applyMerged,
+        });
+      }
     },
   };
 });

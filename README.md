@@ -4,7 +4,7 @@
 
 - **真应用**：基于 Tauri 2，安装包仅几 MB，启动快、内存占用低
 - **本地优先**：数据存在你自己的设备上，无账号、无追踪
-- **WebDAV 同步**：通过你自己的网盘（坚果云、Nextcloud 等）多端同步，支持 ETag 乐观锁与自动合并
+- **双通道同步**：WebDAV 网盘或 GitHub 私有仓库（HTTPS + Token，无需 SSH），任务级自动合并
 - **智能输入**：`明天 交报告 #工作 !高` 一行搞定日期 / 列表 / 优先级
 - **小组件就绪**：macOS WidgetKit 与 Android AppWidget 的数据通道与接口已预留（见下）
 
@@ -56,18 +56,27 @@ pnpm tauri android build --apk --debug --target aarch64
 没有 Android 环境也可以直接用 GitHub Actions：推送 `v*` tag（或手动
 workflow_dispatch）即可在 Release 页下载三端安装包。
 
-## WebDAV 同步配置（以坚果云为例）
+## 同步配置
 
-1. 设置 → WebDAV 同步，填入：
-   - 服务器地址：`https://dav.jianguoyun.com/dav/`
-   - 账号：注册邮箱
-   - 应用密码：坚果云官网「安全选项 → 添加应用密码」生成（不是登录密码）
-   - 远程目录：默认 `TodoLite`
-2. 「测试连接」→「保存配置」→「立即同步」
-3. 其他设备填同一配置，开启「变更后自动同步」
+设置 → 同步，二选一即可，两通道语义一致：任务/列表按 `id` 并集、`updatedAt` 新者胜（LWW）；
+删除以墓碑传播；设置项以本地为准。密码/Token 只存本机系统凭据管理器，永不上传。
 
-同步语义：任务/列表按 `id` 并集、`updatedAt` 新者胜（LWW）；删除以墓碑传播；
-设置项以本地为准。密码只存系统凭据管理器，永不上传。
+### WebDAV（坚果云示例）
+
+1. 服务器地址：`https://dav.jianguoyun.com/dav/`，账号 + 「应用密码」（官网安全选项里生成）
+2. 「测试连接」→「保存配置」→「立即同步」；其他设备填同一配置
+
+### GitHub 仓库
+
+1. 在 GitHub 建一个**私有仓库**（如 `your-name/todolite-sync`）
+2. 创建 fine-grained Token：github.com/settings/personal-access-tokens/new →
+   只勾选该仓库 + **Contents: Read and write**
+3. 应用内填 `owner/repo`、分支（`main`）、Token，测试连接 → 立即同步
+
+认证走 HTTPS + Token，**三端（含 Android）配置方式完全相同，无需配置 SSH 密钥**；
+Token 只存系统凭据管理器。每次同步在仓库中就是一个真实 commit，数据文件
+（默认 `todolite-data.json`）历史完整可回溯；单文件上限 1MB（Contents API 限制，
+约数千条带备注的任务，正常个人使用远达不到）。
 
 ## 小组件（路线图）
 

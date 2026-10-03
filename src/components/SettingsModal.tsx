@@ -1,8 +1,19 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { CloudUpload, Download, Loader2, RefreshCw, X } from "lucide-react";
+import {
+  Cloud,
+  CloudUpload,
+  Database,
+  Download,
+  Github,
+  Loader2,
+  Palette,
+  RefreshCw,
+  X,
+} from "lucide-react";
 import { ACCENTS, type AccentName, type ThemeMode } from "@/core/models";
 import { davTest } from "@/sync/webdav";
+import { ghTest } from "@/sync/github";
 import { useDataStore } from "@/stores/data";
 import { useSyncStore } from "@/stores/sync";
 import { useUiStore } from "@/stores/ui";
@@ -29,7 +40,7 @@ export function SettingsModal() {
         className="fade-in absolute inset-0 bg-black/40 backdrop-blur-[2px]"
         onClick={() => setOpen(false)}
       />
-      <div className="pop-in relative flex max-h-[88vh] w-[560px] max-w-full flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl shadow-black/20">
+      <div className="pop-in relative flex max-h-[88vh] w-[580px] max-w-full flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl shadow-black/20">
         <div className="flex shrink-0 items-center justify-between border-b border-line px-5 py-3.5">
           <h2 className="text-[15px] font-bold">设置</h2>
           <button
@@ -41,7 +52,7 @@ export function SettingsModal() {
             <X size={15} />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
           <AppearanceSection />
           <SyncSection />
           <DataSection />
@@ -49,6 +60,26 @@ export function SettingsModal() {
         </div>
       </div>
     </div>
+  );
+}
+
+function Card({
+  icon,
+  title,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border border-line/60 bg-panel2/40 p-4">
+      <h3 className="mb-3 flex items-center gap-2 text-[13px] font-bold">
+        <span className="text-ink2">{icon}</span>
+        {title}
+      </h3>
+      {children}
+    </section>
   );
 }
 
@@ -66,8 +97,7 @@ function AppearanceSection() {
   const updateSettings = useDataStore((s) => s.updateSettings);
 
   return (
-    <section className="mb-6">
-      <h3 className="mb-3 text-[13px] font-bold">外观</h3>
+    <Card icon={<Palette size={14} />} title="外观">
       <div className="flex items-center gap-4">
         <div className="flex flex-1 rounded-xl bg-panel2 p-1">
           {THEMES.map((t) => (
@@ -103,11 +133,11 @@ function AppearanceSection() {
           ))}
         </div>
       </div>
-    </section>
+    </Card>
   );
 }
 
-// ---------- WebDAV 同步 ----------
+// ---------- 同步 ----------
 
 function Switch({ checked, onChange }: { checked: boolean; onChange(v: boolean): void }) {
   return (
@@ -131,12 +161,72 @@ function Switch({ checked, onChange }: { checked: boolean; onChange(v: boolean):
   );
 }
 
+function StatusLine({
+  localMsg,
+  lastSyncAt,
+}: {
+  localMsg: { ok: boolean; text: string } | null;
+  lastSyncAt: string | null;
+}) {
+  const { status, message } = useSyncStore();
+  return (
+    <p
+      className={cn(
+        "mt-2.5 text-xs",
+        localMsg ? (localMsg.ok ? "text-ok" : "text-danger") : "text-ink3",
+      )}
+    >
+      {localMsg
+        ? localMsg.text
+        : status === "error" && message
+          ? message
+          : lastSyncAt
+            ? `上次同步：${formatRelativeTime(lastSyncAt)}`
+            : "尚未同步"}
+    </p>
+  );
+}
+
 function SyncSection() {
+  const syncBackend = useDataStore((s) => s.db.settings.syncBackend);
+  const setSyncBackend = useDataStore((s) => s.setSyncBackend);
+
+  return (
+    <Card icon={<Cloud size={14} />} title="同步">
+      <div className="mb-4 flex rounded-xl bg-panel2 p-1">
+        {(
+          [
+            { value: "webdav", label: "WebDAV 网盘" },
+            { value: "github", label: "GitHub 仓库" },
+          ] as const
+        ).map((b) => (
+          <button
+            key={b.value}
+            type="button"
+            onClick={() => setSyncBackend(b.value)}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-[13px] transition-all",
+              syncBackend === b.value
+                ? "bg-panel font-medium shadow-sm"
+                : "text-ink2 hover:text-ink",
+            )}
+          >
+            {b.value === "github" && <Github size={13} />}
+            {b.label}
+          </button>
+        ))}
+      </div>
+      {syncBackend === "github" ? <GitHubForm /> : <WebDAVForm />}
+    </Card>
+  );
+}
+
+function WebDAVForm() {
   const webdav = useDataStore((s) => s.db.settings.webdav);
   const lastSyncAt = useDataStore((s) => s.db.settings.lastSyncAt);
   const setWebDAV = useDataStore((s) => s.setWebDAV);
   const triggerSync = useDataStore((s) => s.triggerSync);
-  const { status, message } = useSyncStore();
+  const { status } = useSyncStore();
 
   const [url, setUrl] = useState(webdav?.url ?? "");
   const [username, setUsername] = useState(webdav?.username ?? "");
@@ -161,7 +251,10 @@ function SyncSection() {
     setBusy("test");
     setLocalMsg(null);
     const savedPassword = await getSecret("webdav");
-    const res = await davTest({ ...currentCfg(), password: password.trim() || savedPassword || "" });
+    const res = await davTest({
+      ...currentCfg(),
+      password: password.trim() || savedPassword || "",
+    });
     setLocalMsg({ ok: res.ok, text: res.message });
     setBusy(null);
   };
@@ -180,14 +273,13 @@ function SyncSection() {
 
   const onSync = async () => {
     setBusy("sync");
-    await onSave(); // 先保存，确保配置一致
+    await onSave();
     await triggerSync();
     setBusy(null);
   };
 
   return (
-    <section className="mb-6">
-      <h3 className="mb-3 text-[13px] font-bold">WebDAV 同步</h3>
+    <div>
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <label className={labelCls}>服务器地址</label>
@@ -253,21 +345,147 @@ function SyncSection() {
         </button>
       </div>
 
-      <p
-        className={cn(
-          "mt-2.5 text-xs",
-          localMsg ? (localMsg.ok ? "text-ok" : "text-danger") : "text-ink3",
-        )}
-      >
-        {localMsg
-          ? localMsg.text
-          : status === "error" && message
-            ? message
-            : lastSyncAt
-              ? `上次同步：${formatRelativeTime(lastSyncAt)}`
-              : "尚未同步。坚果云等服务的 WebDAV 需使用「应用密码」而非登录密码。"}
+      <StatusLine localMsg={localMsg} lastSyncAt={lastSyncAt} />
+      <p className="mt-1.5 text-[11px] leading-relaxed text-ink3">
+        坚果云等服务的 WebDAV 需使用「应用密码」而非登录密码；密码只存本机系统凭据管理器。
       </p>
-    </section>
+    </div>
+  );
+}
+
+function GitHubForm() {
+  const gh = useDataStore((s) => s.db.settings.github);
+  const lastSyncAt = useDataStore((s) => s.db.settings.lastSyncAt);
+  const setGitHub = useDataStore((s) => s.setGitHub);
+  const triggerSync = useDataStore((s) => s.triggerSync);
+  const { status } = useSyncStore();
+
+  const [repo, setRepo] = useState(gh?.repo ?? "");
+  const [branch, setBranch] = useState(gh?.branch ?? "main");
+  const [path, setPath] = useState(gh?.path ?? "todolite-data.json");
+  const [token, setToken] = useState("");
+  const [autoSync, setAutoSync] = useState(gh?.autoSync ?? true);
+  const [busy, setBusy] = useState<"test" | "save" | "sync" | null>(null);
+  const [localMsg, setLocalMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const currentCfg = () => ({
+    repo: repo.trim(),
+    branch: branch.trim() || "main",
+    path: path.trim() || "todolite-data.json",
+    autoSync,
+  });
+
+  const onTest = async () => {
+    if (!repo.trim()) {
+      setLocalMsg({ ok: false, text: "请先填写仓库名（owner/repo）" });
+      return;
+    }
+    setBusy("test");
+    setLocalMsg(null);
+    const savedToken = await getSecret("github");
+    const res = await ghTest(token.trim() || savedToken || "", currentCfg());
+    setLocalMsg({ ok: res.ok, text: res.message });
+    setBusy(null);
+  };
+
+  const onSave = async () => {
+    setBusy("save");
+    try {
+      if (token.trim()) await setSecret("github", token.trim());
+      setGitHub(currentCfg());
+      setLocalMsg({ ok: true, text: "配置已保存" });
+    } catch (e) {
+      setLocalMsg({ ok: false, text: `保存失败：${String(e)}` });
+    }
+    setBusy(null);
+  };
+
+  const onSync = async () => {
+    setBusy("sync");
+    await onSave();
+    await triggerSync();
+    setBusy(null);
+  };
+
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelCls}>仓库（owner/repo）</label>
+          <input
+            className={inputCls}
+            value={repo}
+            onChange={(e) => setRepo(e.target.value)}
+            placeholder="your-name/todolite-sync"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+        <div>
+          <label className={labelCls}>分支</label>
+          <input
+            className={inputCls}
+            value={branch}
+            onChange={(e) => setBranch(e.target.value)}
+            placeholder="main"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+        <div>
+          <label className={labelCls}>文件路径</label>
+          <input
+            className={inputCls}
+            value={path}
+            onChange={(e) => setPath(e.target.value)}
+            placeholder="todolite-data.json"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+        <div>
+          <label className={labelCls}>访问 Token（PAT）</label>
+          <input
+            className={inputCls}
+            type="password"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            placeholder={gh ? "已保存（留空不修改）" : "ghp_… / github_pat_…"}
+            autoComplete="new-password"
+          />
+        </div>
+        <div className="col-span-2 flex items-center gap-2">
+          <Switch checked={autoSync} onChange={setAutoSync} />
+          <span className="text-[13px] text-ink2">变更后自动同步（每次同步 = 一个 commit）</span>
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center gap-2">
+        <button type="button" className={btnCls} onClick={onTest} disabled={busy !== null}>
+          {busy === "test" ? <Loader2 size={13} className="animate-spin" /> : <CloudUpload size={13} />}
+          测试连接
+        </button>
+        <button type="button" className={btnPrimaryCls} onClick={onSave} disabled={busy !== null}>
+          {busy === "save" ? <Loader2 size={13} className="animate-spin" /> : null}
+          保存配置
+        </button>
+        <button type="button" className={btnCls} onClick={onSync} disabled={busy !== null}>
+          {busy === "sync" || status === "syncing" ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : (
+            <RefreshCw size={13} />
+          )}
+          立即同步
+        </button>
+      </div>
+
+      <StatusLine localMsg={localMsg} lastSyncAt={lastSyncAt} />
+      <p className="mt-1.5 text-[11px] leading-relaxed text-ink3">
+        建议使用私有仓库。Token 在 github.com/settings/personal-access-tokens/new 创建
+        （fine-grained）：只勾选这一个仓库 +「Contents: Read and write」权限即可。
+        认证走 HTTPS，三端配置方式完全相同，无需配置 SSH 密钥；Token 只存本机系统凭据管理器。
+      </p>
+    </div>
   );
 }
 
@@ -314,8 +532,7 @@ function DataSection() {
   };
 
   return (
-    <section className="mb-6">
-      <h3 className="mb-3 text-[13px] font-bold">数据</h3>
+    <Card icon={<Database size={14} />} title="数据">
       <div className="flex items-center gap-2">
         <button type="button" className={btnCls} onClick={onExport}>
           <Download size={13} />
@@ -342,7 +559,7 @@ function DataSection() {
       {dataDir && (
         <p className="mt-2 text-xs leading-relaxed text-ink3">数据目录：{dataDir}</p>
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -358,14 +575,13 @@ function AboutSection() {
   }, []);
 
   return (
-    <section>
-      <h3 className="mb-3 text-[13px] font-bold">关于</h3>
+    <Card icon={<Github size={14} />} title="关于">
       <p className="text-xs leading-relaxed text-ink3">
         TodoLite v{info?.appVersion ?? "0.1.0"}
         {info ? ` · ${info.os}/${info.arch}` : ""} · 轻量、本地优先的跨平台待办清单
         <br />
-        数据存储在本机，通过你自己的 WebDAV 网盘同步，无任何第三方服务。
+        数据存储在本机，通过你自己的 WebDAV 网盘或 GitHub 私有仓库同步，无任何第三方服务。
       </p>
-    </section>
+    </Card>
   );
 }

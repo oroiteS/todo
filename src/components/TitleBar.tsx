@@ -19,7 +19,11 @@ export function TitleBar() {
 
   const theme = useDataStore((s) => s.db.settings.theme);
   const updateSettings = useDataStore((s) => s.updateSettings);
-  const webdav = useDataStore((s) => s.db.settings.webdav);
+  const syncConfigured = useDataStore((s) =>
+    s.db.settings.syncBackend === "github"
+      ? !!s.db.settings.github
+      : !!s.db.settings.webdav,
+  );
   const triggerSync = useDataStore((s) => s.triggerSync);
 
   const { status, message, lastSyncAt } = useSyncStore();
@@ -43,13 +47,15 @@ export function TitleBar() {
         <Menu size={17} />
       </button>
 
-      <div
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-white shadow-sm"
-        style={{ background: "linear-gradient(135deg,#f97316,var(--accent))" }}
+      <span
+        className="mr-1 hidden shrink-0 text-[15px] font-extrabold tracking-tight sm:block"
+        style={{
+          backgroundImage: "linear-gradient(120deg,#f97316,var(--accent))",
+          WebkitBackgroundClip: "text",
+          backgroundClip: "text",
+          color: "transparent",
+        }}
       >
-        <Check size={13} strokeWidth={3.5} />
-      </div>
-      <span className="mr-1 hidden shrink-0 text-[15px] font-bold tracking-tight sm:block">
         TodoLite
       </span>
 
@@ -72,7 +78,7 @@ export function TitleBar() {
         </div>
       </div>
 
-      {webdav && (
+      {syncConfigured && (
         <button
           type="button"
           title={

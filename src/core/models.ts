@@ -44,7 +44,19 @@ export interface WebDAVConfig {
   autoSync: boolean;
 }
 
+export interface GitHubSyncConfig {
+  /** owner/repo，建议私有仓库 */
+  repo: string;
+  /** 默认 main */
+  branch: string;
+  /** 仓库内文件路径，默认 todolite-data.json */
+  path: string;
+  autoSync: boolean;
+}
+
 export type ThemeMode = "system" | "light" | "dark";
+
+export type SyncBackendKind = "webdav" | "github";
 
 export type AccentName =
   | "rose"
@@ -70,8 +82,12 @@ export const ACCENTS: Record<AccentName, string> = {
 export interface Settings {
   theme: ThemeMode;
   accent: AccentName;
+  /** 当前使用的同步后端 */
+  syncBackend: SyncBackendKind;
   /** WebDAV 配置（密码不在此处，存系统凭据管理器） */
   webdav: WebDAVConfig | null;
+  /** GitHub 配置（Token 存系统凭据管理器） */
+  github: GitHubSyncConfig | null;
   lastSyncAt: string | null;
 }
 

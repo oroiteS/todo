@@ -45,7 +45,7 @@ export function QuickAdd({ currentListId }: { currentListId?: string }) {
   };
 
   return (
-    <div className="mx-5 mb-2 flex shrink-0 items-center gap-2.5 rounded-xl border border-line bg-panel px-3.5 py-2.5 shadow-sm transition-colors focus-within:border-accent/50">
+    <div className="mx-5 mb-2 flex shrink-0 items-center gap-2.5 rounded-xl border border-line bg-panel px-3.5 py-2.5 shadow-sm transition-all focus-within:border-accent/40 focus-within:shadow-[0_0_0_4px_var(--accent-soft)]">
       <Plus size={15} className="shrink-0 text-ink3" />
       <input
         ref={inputRef}
