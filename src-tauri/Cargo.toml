@@ -1,0 +1,31 @@
+[package]
+name = "todolite"
+version = "0.1.0"
+description = "TodoLite — 轻量、好看的跨平台待办清单"
+authors = ["syn"]
+edition = "2021"
+
+[lib]
+name = "todolite_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-http = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+
+# 桌面端：系统级凭据存储（macOS Keychain / Windows 凭据管理器 / Linux secret-service）
+# Android 端不依赖 keyring，使用应用私有目录文件存储（见 commands.rs）
+[target.'cfg(not(target_os = "android"))'.dependencies]
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

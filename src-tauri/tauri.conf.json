@@ -1,0 +1,47 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "TodoLite",
+  "version": "0.1.0",
+  "identifier": "com.syn.todolite",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "TodoLite",
+        "label": "main",
+        "width": 1080,
+        "height": 700,
+        "minWidth": 680,
+        "minHeight": 460,
+        "center": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Productivity",
+    "shortDescription": "轻量、好看的跨平台待办清单",
+    "longDescription": "TodoLite 是一个覆盖 macOS / Windows / Android 的轻量待办清单应用，本地优先，支持 WebDAV 同步，并为桌面与移动端小组件预留接口。",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "android": {
+      "minSdkVersion": 24
+    }
+  }
+}

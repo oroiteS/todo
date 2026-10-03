@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">"TodoLite"</string>
+    <string name="main_activity_title">"TodoLite"</string>
+</resources>

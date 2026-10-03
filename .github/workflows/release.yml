@@ -1,0 +1,144 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            label: macos-arm64
+            args: "--target aarch64-apple-darwin"
+            bundle-dir: src-tauri/target/aarch64-apple-darwin/release/bundle
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            label: macos-x64
+            args: "--target x86_64-apple-darwin"
+            bundle-dir: src-tauri/target/x86_64-apple-darwin/release/bundle
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            label: windows-x64
+            args: ""
+            bundle-dir: src-tauri/target/release/bundle
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build desktop bundles
+        run: pnpm tauri build ${{ matrix.args }}
+
+      - name: Run frontend tests
+        run: pnpm test
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: todolite-${{ matrix.label }}
+          path: ${{ matrix.bundle-dir }}
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r27b
+          add-to-path: false
+
+      - name: Ensure Android SDK
+        run: |
+          if [ -z "$ANDROID_HOME" ]; then
+            echo "ANDROID_HOME=$HOME/android-sdk" >> "$GITHUB_ENV"
+            mkdir -p "$HOME/android-sdk/cmdline-tools"
+            # ubuntu runner 自带 SDK；此分支仅为自托管兜底
+          fi
+
+      - name: Ensure Android project
+        run: test -d src-tauri/gen/android || pnpm tauri android init
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build debug APK (arm64)
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: pnpm tauri android build --apk --debug --target aarch64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: todolite-android-arm64
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+
+  release:
+    needs: [desktop, android]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: release-files
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-files/**/*.dmg
+            release-files/**/*.app/**
+            release-files/**/*.exe
+            release-files/**/*.msi
+            release-files/**/*.apk
+          generate_release_notes: true

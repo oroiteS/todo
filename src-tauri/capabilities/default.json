@@ -1,0 +1,15 @@
+{
+  "identifier": "default",
+  "description": "TodoLite 主窗口能力授权",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://**" },
+        { "url": "http://**" }
+      ]
+    }
+  ]
+}

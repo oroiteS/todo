@@ -1,0 +1,148 @@
+// WebDAV 客户端：基于 @tauri-apps/plugin-http（绕过 WebView CORS，支持自定义方法）。
+// 仅使用同步场景所需的最小操作集：GET / PUT(If-Match) / MKCOL / PROPFIND。
+
+import { fetch } from "@tauri-apps/plugin-http";
+
+export interface DavConfig {
+  url: string;
+  username: string;
+  password: string;
+  directory: string;
+}
+
+export class DavError extends Error {
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = "DavError";
+    this.status = status;
+  }
+}
+
+export function normalizeBaseUrl(url: string): string {
+  return url.trim().replace(/\/+$/, "");
+}
+
+export function normalizeDir(dir: string): string {
+  return dir.trim().replace(/^\/+|\/+$/g, "");
+}
+
+export function fileUrl(cfg: DavConfig, rel: string): string {
+  const dir = normalizeDir(cfg.directory);
+  return `${normalizeBaseUrl(cfg.url)}/${dir ? `${dir}/` : ""}${rel}`;
+}
+
+function utf8ToBase64(s: string): string {
+  const bytes = new TextEncoder().encode(s);
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+function authHeaders(cfg: DavConfig): Record<string, string> {
+  if (!cfg.username && !cfg.password) return {};
+  return { Authorization: `Basic ${utf8ToBase64(`${cfg.username}:${cfg.password}`)}` };
+}
+
+function timeoutSignal(ms = 20000): AbortSignal | undefined {
+  try {
+    return AbortSignal.timeout(ms);
+  } catch {
+    return undefined;
+  }
+}
+
+/** GET 文件；404 返回 null（首次同步） */
+export async function davGet(
+  cfg: DavConfig,
+  rel: string,
+): Promise<{ text: string; etag: string | null } | null> {
+  const res = await fetch(fileUrl(cfg, rel), {
+    method: "GET",
+    headers: authHeaders(cfg),
+    signal: timeoutSignal(),
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new DavError(`读取失败（HTTP ${res.status}）`, res.status);
+  const text = await res.text();
+  return { text, etag: res.headers.get("etag") };
+}
+
+/** PUT 文件；412 表示远端已被其他人修改（乐观锁冲突） */
+export async function davPut(
+  cfg: DavConfig,
+  rel: string,
+  body: string,
+  ifMatch?: string | null,
+): Promise<{ etag: string | null }> {
+  const headers = {
+    ...authHeaders(cfg),
+    "Content-Type": "application/json; charset=utf-8",
+    ...(ifMatch ? { "If-Match": ifMatch } : {}),
+  };
+  const res = await fetch(fileUrl(cfg, rel), {
+    method: "PUT",
+    headers,
+    body,
+    signal: timeoutSignal(),
+  });
+  if (res.status === 412) {
+    throw new DavError("远端数据已被其他设备修改，需要重新合并", 412);
+  }
+  if (!res.ok) throw new DavError(`上传失败（HTTP ${res.status}）`, res.status);
+  return { etag: res.headers.get("etag") };
+}
+
+/** 逐级 MKCOL 创建远程目录；已存在（405）视为成功 */
+export async function davEnsureDirectory(cfg: DavConfig): Promise<void> {
+  const segments = normalizeDir(cfg.directory).split("/").filter(Boolean);
+  let acc = normalizeBaseUrl(cfg.url);
+  for (const seg of segments) {
+    acc += `/${seg}`;
+    try {
+      const res = await fetch(`${acc}/`, {
+        method: "MKCOL",
+        headers: authHeaders(cfg),
+        signal: timeoutSignal(),
+      });
+      if (res.ok || res.status === 405 || res.status === 301 || res.status === 409) {
+        continue;
+      }
+      if (res.status === 403) {
+        throw new DavError("服务器拒绝创建目录（403），请检查权限", 403);
+      }
+      // 其他状态码容忍：部分服务器会在 PUT 时自动建目录
+    } catch (e) {
+      if (e instanceof DavError) throw e;
+      // 网络层错误继续尝试下一级，最终由 PUT 验证
+    }
+  }
+}
+
+/** 设置页「测试连接」 */
+export async function davTest(
+  cfg: DavConfig,
+): Promise<{ ok: boolean; message: string }> {
+  const base = normalizeBaseUrl(cfg.url);
+  try {
+    const res = await fetch(`${base}/`, {
+      method: "PROPFIND",
+      headers: { ...authHeaders(cfg), Depth: "0" },
+      signal: timeoutSignal(12000),
+    });
+    if (res.ok || res.status === 207) return { ok: true, message: "连接成功" };
+    if (res.status === 401) return { ok: false, message: "账号或密码错误（401）" };
+    if (res.status === 403) return { ok: false, message: "服务器拒绝访问（403）" };
+    // 部分服务器对根路径 PROPFIND 有限制，回退 GET 验证
+    const res2 = await fetch(base, {
+      method: "GET",
+      headers: authHeaders(cfg),
+      signal: timeoutSignal(12000),
+    });
+    if (res2.status === 401) return { ok: false, message: "账号或密码错误（401）" };
+    if (res2.ok) return { ok: true, message: "连接成功" };
+    return { ok: false, message: `服务器响应 ${res2.status}` };
+  } catch (e) {
+    return { ok: false, message: `网络错误：${e instanceof Error ? e.message : String(e)}` };
+  }
+}
