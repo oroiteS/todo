@@ -1,7 +1,7 @@
-# 小组件适配指南（预留接口说明）
+# 小组件适配指南
 
-v1 已经打通「数据 → 小组件」的完整数据通道，并留好扩展点。本文件是后续实现
-macOS（WidgetKit）与 Android（AppWidget）小组件时的完整施工说明。
+数据通道（应用 → 快照文件）在 v1 打通；**macOS WidgetKit 小组件已在 v1.1 实现**，
+Android（AppWidget）按第 5 节清单待实现。
 
 ## 1. 数据流总览
 
@@ -28,14 +28,18 @@ flowchart LR
 {
   "generatedAt": "2026-01-14T04:00:00.000Z",
   "today": [                       // 今天到期，最多 10 条
-    { "id": "...", "title": "交周报", "listName": "工作", "dueDate": "2026-01-14" }
+    { "id": "...", "title": "交周报", "listName": "工作", "dueDate": "2026-01-14", "priority": 2 }
   ],
   "overdue": [],                   // 已逾期，最多 10 条
+  "highPriority": [                // 高优先级（priority=3）未完成，与到期日无关，最多 10 条；v1.1 新增
+    { "id": "...", "title": "救火", "listName": "工作", "dueDate": null, "priority": 3 }
+  ],
   "counts": {
     "today": 3,          // 今天到期总数（不受 10 条截断影响）
     "upcoming": 5,       // 未来 7 天
     "all": 42,           // 全部未完成
-    "completedToday": 7  // 今日已完成
+    "completedToday": 7, // 今日已完成
+    "highPriority": 1    // 高优先级总数；v1.1 新增
   }
 }
 ```
@@ -46,27 +50,64 @@ flowchart LR
 
 | 平台 | 路径 | 说明 |
 |---|---|---|
-| macOS | `~/Library/Group Containers/group.com.syn.todolite/widget-snapshot.json` | 目录存在才使用；否则回退 App Data `widget/` |
+| macOS | `~/Library/Group Containers/group.com.syn.todolite/widget-snapshot.json` | 目录不存在时主应用会直接创建（主应用非沙盒）；创建失败才回退 App Data `widget/` |
 | Android | 应用私有目录 `widget/widget-snapshot.json`（`files/widget/`） | AppWidget 与主应用同进程不同渲染管线，可直接读 |
 | Windows/Linux | 无（命令返回 false） | Windows 11 小组件无第三方 API，接口保留 |
 
-## 4. macOS WidgetKit 施工清单（后续任务）
+## 4. macOS WidgetKit 小组件（✅ 已实现）
 
-1. Xcode 中为主 app 添加 **Widget Extension** target（SwiftUI，WidgetKit）；
-2. 主 app 与 extension 同时开启 **App Groups**，组名 `group.com.syn.todolite`
-   （`src-tauri/gen/apple` 下的 entitlements 文件加
-   `com.apple.security.application-groups` 条目；正式分发需对应签名的 App Group）；
-3. Extension 的 `TimelineProvider` 读取快照文件（App Group 容器路径），
-   渲染小/中/大三种尺寸：
-   - 小：`counts.today` 大数字 + 「今日待办」
-   - 中：today 前 3 条标题列表
-   - 大：today + overdue 合并列表
-4. `.containerBackground(for: .widget)` 使用快照里没有的信息（如强调色）时，
-   直接读主 app 的 `UserDefaults(suiteName: "group.com.syn.todolite")`——
-   可在 `write_widget_snapshot` 中顺带写入 accent 颜色（预留）；
-5. 刷新策略：`.timelinePolicy(.after(nextUpdate))` 每小时兜底刷新一次即可，
-   数据变化由主 app 写文件 + `WidgetCenter.shared.reloadTimelines()` 触发
-   （需要在 Swift 侧桥接，或在快照写入后由 app 调用；后续任务实现）。
+源码在 `src-tauri/widgets/macos/`，构建脚本 `scripts/build-macos-widget.sh`。
+
+### 4.1 结构
+
+| 文件 | 作用 |
+|---|---|
+| `TodoLiteWidget.swift` | WidgetBundle + TimelineProvider + 小/中/大三种尺寸渲染 |
+| `Info.plist` | `.appex` 配置（Bundle ID `com.syn.todolite.widget`，widgetkit-extension 扩展点） |
+| `TodoLiteWidget.entitlements` | App Sandbox + App Groups（`group.com.syn.todolite`） |
+
+### 4.2 渲染内容（用户视角）
+
+- **小**：今日待办大数字 + 高优计数 + 今日已完成
+- **中**：左「今日」（至多 5 条）/ 右「高优先」（至多 5 条）双栏
+- **大**：上下两段完整列表；逾期任务红字 + 「逾期」角标，高优任务橙色 ❗ 角标
+
+### 4.3 构建与安装
+
+```bash
+pnpm tauri build                    # 先构建主应用
+scripts/build-macos-widget.sh       # swiftc 编译 universal .appex → 签名 → 嵌入 PlugIns
+open src-tauri/target/release/bundle/macos/TodoLite.app
+# 通知中心 → 编辑小组件 → 搜索 TodoLite → 添加「今日待办」
+```
+
+脚本要点：本仓库无 Xcode 工程（Tauri 桌面端走 cargo），故用 `swiftc`
+手工编译 arm64+x86_64 并 `lipo` 合成 universal；extension 以 ad-hoc 身份
+签名；嵌入后重签外层 .app 时**注入 App Groups entitlements**
+（`TodoLiteApp.entitlements`，仅组名、无沙盒），并刻意不用 `--deep`
+以免覆盖 extension 已带 entitlements 的签名。
+
+### 4.4 数据流与刷新
+
+- 读取顺序：`containerURL(App Group)` → 标准 Group Containers 路径 →
+  App Data `widget/`（与 Rust 侧落点一一对应，任一可读即用）；
+- 解码容错：所有字段 `decodeIfPresent` + 默认值，旧快照/缺字段不崩（契约见第 6 节）；
+- 刷新：timeline 每 15 分钟兜底重读快照（WidgetKit 按预算自动合并）。
+  主应用是 Rust 进程，暂无法直接调 `WidgetCenter.reloadTimelines()`；
+  如需秒级刷新，后续可加一个 Swift 助手或为 Tauri 桥接 ObjC，见 Roadmap。
+
+### 4.5 已知限制（当前 ad-hoc 路线）
+
+- **App Group 容器需要真实签名**：macOS 只为有 Team 签名的进程创建
+  `~/Library/Group Containers/<group>` 容器（Xcode 中开启 App Groups 同样要求
+  选 Team）。ad-hoc 本地运行时主应用创建会被系统拒绝（EPERM），快照自动回退到
+  `~/Library/Application Support/com.syn.todolite/widget/`。
+- **因此扩展暂不开启 App Sandbox**：无沙盒的扩展才能在回退路径下读到快照，
+  保证"无签名也能用"。正式上架/公证前需做两件事：
+  1. 用开发者身份签名（App Group 注册到对应 Team），届时主应用能正常创建容器；
+  2. 在 `TodoLiteWidget.entitlements` 恢复 `com.apple.security.app-sandbox = true`
+     （扩展届时只从 Group 容器读取，该行文件内有注释标记）。
+- 刷新为 timeline 兜底（≤15 分钟），添加/移除小组件或等待兜底即可看到最新数据。
 
 ## 5. Android AppWidget 施工清单（后续任务）
 

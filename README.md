@@ -6,7 +6,7 @@
 - **本地优先**：数据存在你自己的设备上，无账号、无追踪
 - **双通道同步**：WebDAV 网盘或 GitHub 私有仓库（HTTPS + Token，无需 SSH），任务级自动合并
 - **智能输入**：`明天 交报告 #工作 !高` 一行搞定日期 / 列表 / 优先级
-- **小组件就绪**：macOS WidgetKit 与 Android AppWidget 的数据通道与接口已预留（见下）
+- **macOS 小组件**：WidgetKit 小组件展示「今日待办 + 高优先级任务」，数据经快照文件同步
 
 ## 功能（v1 · 标准个人版）
 
@@ -56,6 +56,16 @@ pnpm tauri build    # 产出 .app/.dmg 或 .exe/.msi
 ```
 
 要求：Node 20+、pnpm、Rust stable；Windows 端需 WebView2（Win11 自带）。
+
+### macOS 小组件
+
+```bash
+pnpm tauri build               # 先构建主应用
+scripts/build-macos-widget.sh  # swiftc 编译 WidgetKit 扩展并嵌入 .app
+```
+
+打开应用后在 通知中心 → 编辑小组件 添加「今日待办」。原理与限制见
+[docs/widget-adaptation.md](docs/widget-adaptation.md)。
 
 ## Android
 
@@ -108,12 +118,12 @@ Token 只存系统凭据管理器。每次同步在仓库中就是一个真实 c
 （默认 `todolite-data.json`）历史完整可回溯；单文件上限 1MB（Contents API 限制，
 约数千条带备注的任务，正常个人使用远达不到）。
 
-## 小组件（路线图）
+## 小组件
 
-数据通道已预留：应用每次变更都会把「今日/逾期任务摘要 + 计数」快照写到
-平台共享位置（macOS App Group 容器 / Android files 目录）。后续实现
-macOS WidgetKit 与 Android AppWidget 时**无需改动核心代码**，
-施工清单见 [docs/widget-adaptation.md](docs/widget-adaptation.md)。
+macOS 已实现（WidgetKit，内容为**今日待办 + 高优先级任务**）：应用每次变更都会把
+「今日/逾期/高优任务摘要 + 计数」快照写到平台共享位置，小组件扩展读取渲染；
+构建方式与签名限制见 [docs/widget-adaptation.md](docs/widget-adaptation.md)。
+Android AppWidget 按同一数据通道待实现（施工清单见同一文档）。
 
 ## 目录结构
 
@@ -128,15 +138,18 @@ src/                  前端（三端共享 100% 逻辑）
 src-tauri/            Tauri 壳
 ├── src/commands.rs   数据文件原子读写+备份、凭据、平台信息
 ├── src/widget/       ★ 分平台快照落点（cfg）
+├── widgets/macos/    ★ macOS WidgetKit 小组件（SwiftUI，swiftc 构建）
 └── gen/android/      Android Studio 工程（已入库）
+scripts/              构建辅助（macOS 小组件嵌入、Android 密钥等）
 Casks/                Homebrew tap（macOS cask，随 Release 自动升级）
 .github/workflows/    三端构建 CI
 ```
 
 ## Roadmap
 
-- [ ] macOS 小组件（WidgetKit）—— 接口已预留
-- [ ] Android 小组件（AppWidget / Glance）—— 接口已预留
+- [x] macOS 小组件（WidgetKit）—— 今日待办 + 高优先级任务
+- [ ] 小组件即时刷新（WidgetCenter.reloadTimelines 桥接）
+- [ ] Android 小组件（AppWidget / Glance）—— 数据通道已预留
 - [ ] 任务提醒系统通知
 - [ ] 子任务 / 重复任务 / 标签
 - [ ] macOS / Windows 正式签名与公证（CI 已预留，配置 Apple secrets 即自动生效）
