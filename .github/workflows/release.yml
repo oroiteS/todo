@@ -137,7 +137,6 @@ jobs:
         with:
           files: |
             release-files/**/*.dmg
-            release-files/**/*.app/**
             release-files/**/*.exe
             release-files/**/*.msi
             release-files/**/*.apk
