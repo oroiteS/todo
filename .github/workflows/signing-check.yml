@@ -1,0 +1,43 @@
+name: Android 签名自检
+
+# 手动触发:验证签名 Secrets 配置是否正确(约 30 秒,不构建应用)。
+# 打印的证书指纹是公开信息(存在于每个 APK 的签名里),密码不会显示。
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: 校验签名 Secrets 并打印证书指纹
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 未配置"; exit 1
+          fi
+          if [ -z "$ANDROID_KEYSTORE_PASSWORD" ]; then
+            echo "::error::ANDROID_KEYSTORE_PASSWORD 未配置"; exit 1
+          fi
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > /tmp/check.jks
+          if ! keytool -list -v -keystore /tmp/check.jks \
+                -alias "${ANDROID_KEY_ALIAS:-todolite}" \
+                -storepass "$ANDROID_KEYSTORE_PASSWORD" > /tmp/keytool.txt 2>&1; then
+            echo "::error::校验失败:检查 ANDROID_KEYSTORE_BASE64(复制是否完整)、ANDROID_KEYSTORE_PASSWORD(是否正确)、ANDROID_KEY_ALIAS(默认 todolite)"
+            head -5 /tmp/keytool.txt
+            exit 1
+          fi
+          echo "✅ Secrets 有效。请与本地指纹对比(SHA256 一致即配置正确):"
+          echo
+          grep -E "Alias name|SHA256:|SHA1:|Valid" /tmp/keytool.txt
+          rm -f /tmp/check.jks
