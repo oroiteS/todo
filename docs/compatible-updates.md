@@ -37,7 +37,8 @@ Android 端兼容式更新的核心 = **所有版本用同一把私钥签名**�
 ### 操作步骤(一次性)
 
 ```bash
-./scripts/gen-android-keystore.sh        # 生成 todolite-release.jks,设置一个强密码
+./scripts/gen-android-keystore.sh   # 生成 todolite-release.jks,设置一个强密码(无需安装 JDK,
+                                    # 脚本会自动找本机 keytool,找不到就用 openssl 生成等效 PKCS12)
 ```
 
 然后二选一:
