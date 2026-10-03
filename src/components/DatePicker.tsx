@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   ChevronDown,
@@ -11,6 +11,10 @@ import { useClickOutside } from "./Dropdown";
 
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 const MONTH_LABELS = Array.from({ length: 12 }, (_, i) => `${i + 1}月`);
+
+/** 年份可选范围 */
+const MIN_YEAR = 2000;
+const MAX_YEAR = 2100;
 
 function formatFull(dateStr: string): string {
   const d = parseDate(dateStr);
@@ -49,11 +53,34 @@ export function DatePicker({ value, onChange }: Props) {
 
   const grid = useMemo(() => getMonthGrid(viewYear, viewMonth), [viewYear, viewMonth]);
 
+  /** 年份列表：2000 年起，到当前视图年份 +4（随导航自动延展） */
+  const years = useMemo(() => {
+    const end = Math.min(MAX_YEAR, viewYear + 4);
+    const list: number[] = [];
+    for (let y = MIN_YEAR; y <= end; y++) list.push(y);
+    return list;
+  }, [viewYear]);
+
+  // 年月面板打开 / 切换年份时，把当前年份滚动到列表中央
+  const yearListRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (mode !== "panel") return;
+    const container = yearListRef.current;
+    const el = container?.querySelector<HTMLElement>(`[data-year="${viewYear}"]`);
+    if (container && el) {
+      container.scrollTop =
+        el.offsetTop - container.clientHeight / 2 + el.clientHeight / 2;
+    }
+  }, [mode, viewYear]);
+
   const shiftMonth = (delta: number) => {
     const d = new Date(viewYear, viewMonth + delta, 1);
     setViewYear(d.getFullYear());
     setViewMonth(d.getMonth());
   };
+
+  const shiftYear = (delta: number) =>
+    setViewYear((y) => Math.min(MAX_YEAR, Math.max(MIN_YEAR, y + delta)));
 
   const pick = (date: string) => {
     onChange(date);
@@ -189,7 +216,7 @@ export function DatePicker({ value, onChange }: Props) {
                 <button
                   type="button"
                   aria-label="上一年"
-                  onClick={() => setViewYear((y) => y - 1)}
+                  onClick={() => shiftYear(-1)}
                   className="flex h-6 w-6 items-center justify-center rounded-md text-ink3 transition-colors hover:bg-panel2 hover:text-ink"
                 >
                   <ChevronLeft size={13} />
@@ -198,7 +225,7 @@ export function DatePicker({ value, onChange }: Props) {
                 <button
                   type="button"
                   aria-label="下一年"
-                  onClick={() => setViewYear((y) => y + 1)}
+                  onClick={() => shiftYear(1)}
                   className="flex h-6 w-6 items-center justify-center rounded-md text-ink3 transition-colors hover:bg-panel2 hover:text-ink"
                 >
                   <ChevronRight size={13} />
@@ -226,20 +253,29 @@ export function DatePicker({ value, onChange }: Props) {
                 ))}
               </div>
 
-              <div className="mt-2 border-t border-line/60 pt-1">
-                {[1, 2, 3, 4].map((offset) => {
-                  const y = viewYear + offset;
-                  return (
+              {/* 可滑动年份列表（2000 年起），当前年份自动居中 */}
+              <div className="relative mt-2 border-t border-line/60 pt-1">
+                <div ref={yearListRef} className="relative max-h-32 overflow-y-auto">
+                  {years.map((y) => (
                     <button
                       key={y}
                       type="button"
+                      data-year={y}
                       onClick={() => setViewYear(y)}
-                      className="flex w-full items-center justify-center rounded-lg py-1.5 text-[13px] text-ink2 transition-colors hover:bg-panel2 hover:text-ink"
+                      className={cn(
+                        "flex w-full items-center justify-center rounded-lg py-1.5 text-[13px] transition-colors",
+                        y === viewYear
+                          ? "bg-panel2 font-semibold text-ink"
+                          : "text-ink2 hover:bg-panel2/60 hover:text-ink",
+                      )}
                     >
                       {y}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
+                {/* 上下渐隐，提示可滑动 */}
+                <div className="pointer-events-none absolute inset-x-0 top-1 h-4 bg-gradient-to-b from-panel to-transparent" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-panel to-transparent" />
               </div>
             </>
           )}
