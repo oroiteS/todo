@@ -2,19 +2,22 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- 最终结论（2026-10 实测）：小组件被画廊枚举需要完整系统身份——
-	     开发者签名 + provisioning profile（含 App Group）+ 公证链。
-	     以下四种形态均已实测被 WidgetKit 在枚举阶段过滤（画廊不可见）：
-	       1. ad-hoc + 空 entitlements
-	       2. ad-hoc + 沙盒 + application-groups（无 profile）
-	       3. Apple Development 签名 + 沙盒 + application-groups（无 profile）
-	       4. Apple Development 签名 + 无沙盒 + 空 entitlements
-	     profile 免费账号仅能经 Xcode 工程自动生成（本仓库无工程），
-	     因此小组件定位为「本地构建可选功能」，分发包（CI/brew）不含。
-	     正式启用路径 = Developer Program：Developer ID 签名 + 公证
-	     + App Group profile，届时恢复标准形态：
-	       com.apple.security.app-sandbox = true
-	       com.apple.security.application-groups = [group.com.syn.todolite]
-	     Swift 读取代码已按 容器 → 标准路径 → 回退 排序，形态切换无需改代码。 -->
+	<!-- 2026-10-04 实测结论（macOS 27 / 26A428）：
+	     1. App Sandbox 是 PlugInKit 注册的必要条件——空 entitlements 的 widget
+	        appex 永不注册（pluginkit -m -i 无记录）；加上即注册（dev/ad-hoc 均可），
+	        旧注释「需要付费公证链才能枚举」有误；
+	     2. 但即便注册成功，chronod 拉起扩展抓取描述符时仍会在 ExtensionFoundation
+	        引导阶段崩溃，画廊不可见——与签名形态、groups/network entitlements、
+	        SDK 版本标记均无关（均已对照排除），根因未定位；
+	     3. 同机纯 ad-hoc、Xcode 构建的第三方组件（codex-usage-bar）正常工作，
+	        说明免费签名并非阻碍，问题出在 swiftc 手工构建产物；
+	     4. App Groups 无 profile 时容器创建被拒（EPERM），快照走 App Data 回退。
+	     完整排查记录与恢复路径见 docs/widget-adaptation.md §4.5。 -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.syn.todolite</string>
+	</array>
 </dict>
 </plist>

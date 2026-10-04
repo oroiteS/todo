@@ -1,7 +1,7 @@
 # 小组件适配指南
 
-数据通道（应用 → 快照文件）在 v1 打通；**macOS WidgetKit 小组件已在 v1.1 实现**，
-**Android（AppWidget）已在 v1.2 实现**（见第 5 节）。
+数据通道（应用 → 快照文件）在 v1 打通；**Android（AppWidget）已在 v1.2 实现**（见第 5 节）。
+**macOS WidgetKit 组件代码完成，但被系统枚举阻塞、暂不可用**（2026-10-04 复测，见第 4.5 节）。
 
 ## 1. 数据流总览
 
@@ -54,7 +54,7 @@ flowchart LR
 | Android | 应用私有目录 `widget/widget-snapshot.json`。**实际落点是 `dataDir/widget/`**（Tauri `app_data_dir()` 在 Android 解析为 `activity.dataDir`，即 `/data/user/0/<pkg>/widget/`），AppWidget Provider 读取时对 `dataDir/widget/`、`filesDir/widget/`、外部存储三处按序探测 | AppWidget 与主应用同进程（渲染在宿主进程），Provider 可直接读私有目录 |
 | Windows/Linux | 无（命令返回 false） | Windows 11 小组件无第三方 API，接口保留 |
 
-## 4. macOS WidgetKit 小组件（✅ 已实现）
+## 4. macOS WidgetKit 小组件（⚠️ 代码完成，被 macOS 27 画廊枚举阻塞）
 
 源码在 `src-tauri/widgets/macos/`，构建脚本 `scripts/build-macos-widget.sh`。
 
@@ -78,7 +78,7 @@ flowchart LR
 pnpm tauri build                    # 先构建主应用
 scripts/build-macos-widget.sh       # swiftc 编译 universal .appex → 签名 → 嵌入 PlugIns
 open src-tauri/target/release/bundle/macos/TodoLite.app
-# 通知中心 → 编辑小组件 → 搜索 TodoLite → 添加「今日待办」
+# ⚠️ 当前产物无法出现在小组件画廊（见 4.5），以上流程仅供后续恢复时参考
 ```
 
 脚本要点：本仓库无 Xcode 工程（Tauri 桌面端走 cargo），故用 `swiftc`
@@ -96,31 +96,56 @@ open src-tauri/target/release/bundle/macos/TodoLite.app
   主应用是 Rust 进程，暂无法直接调 `WidgetCenter.reloadTimelines()`；
   如需秒级刷新，后续可加一个 Swift 助手或为 Tauri 桥接 ObjC，见 Roadmap。
 
-### 4.5 已知限制与最终结论（2026-10 实测）
+### 4.5 最终状态与完整排查记录（2026-10-04 复测）
 
-**结论：画廊枚举需要完整系统身份（开发者签名 + App Group profile + 公证链），
-免费账号无法达成，小组件定位为「本地构建可选功能」。**
+**结论：组件代码、数据通道、构建脚本全部完成并保留，但 swiftc 手工构建的
+.appex 无法通过 macOS 27（本机 26A428）的 WidgetKit 画廊枚举，功能标记为
+不可用。免费签名不是阻碍——同机纯 ad-hoc 签名、Xcode 构建的第三方组件
+（codex-usage-bar）工作正常；阻碍在手工构建产物本身，根因未定位。**
 
-已实测四种形态全部被 WidgetKit 在枚举阶段过滤（画廊不可见，且无任何加载日志）：
+事实链（均本机实测）：
 
-| 形态 | 结果 |
-|---|---|
-| ad-hoc + 空 entitlements | ❌ 不枚举 |
-| ad-hoc + 沙盒 + groups（无 profile） | ❌ 不枚举 |
-| Apple Development 签名 + 沙盒 + groups（无 profile） | ❌ 不枚举 |
-| Apple Development 签名 + 无沙盒 + 空 entitlements | ❌ 不枚举 |
+1. 【已修复】旧构建脚本曾把 PlistBuddy 读 JSON 失败的报错串写进
+   `CFBundleShortVersionString`（非法版本串，ExtensionKit 拒绝索引）——
+   现已改为从主应用 Info.plist 读取并严格校验格式；
+2. 【已修复】appex Info.plist 缺 `CFBundleSupportedPlatforms` /
+   `DTPlatformName` 平台元数据——已补齐；
+3. 【已证实】**App Sandbox entitlement 是 PlugInKit 注册的必要条件**：
+   空 entitlements 的扩展永不注册（`pluginkit -m -i` 无记录）；加上
+   `com.apple.security.app-sandbox` 后立即注册，Apple Development 与
+   ad-hoc 签名均可——**旧结论「需要付费公证链才能枚举」有误**；
+4. 【未解决·当前卡点】注册后 chronod 会拉起扩展进程抓取描述符
+   （descriptor fetch），本扩展每次都在
+   `ExtensionFoundation._EXRunningExtension` 引导阶段 SIGTRAP，
+   chronod 记录 `query failed … connection invalidated` 并放弃（约每
+   3 秒重试后停手），画廊因此过滤掉本组件；
+5. 【对照实验】同机安装 codex-usage-bar（开源、纯 ad-hoc 签名、
+   sandbox + groups + network.client、Xcode 26.5 构建）：其扩展
+   chronod `query completed`、画廊正常显示——**macOS 27 对免费 /
+   ad-hoc 第三方组件没有系统性门槛**；
+6. 【已排除的变量】签名形态（Apple Development / ad-hoc）、
+   entitlements 组合（±App Groups ±network.client）、
+   LC_BUILD_VERSION 的 sdk 字段（vtool 改写 27.0→26.5）、
+   Info.plist 键补齐、二进制入口（反汇编对比 `_main` 与 codex 产物
+   完全同构，均调用同一系统符号 `WidgetBundle.main()`）；
+7. 【仍然有效的历史结论】无 provisioning profile 时 App Group 容器
+   创建被拒（EPERM），快照回退
+   `~/Library/Application Support/com.syn.todolite/widget/`；
+   profile 免费账号仅能经 Xcode 工程自动签名生成，本仓库无 Xcode
+   工程；分发包（CI dmg / brew）不含小组件扩展；
+8. 【恢复路径（未验证）】① 用 XcodeGen/xcodebuild 真实构建扩展
+   target——codex 即此类产物，大概率可行；② 若为 OS bug，等 Apple
+   修复后重测；③ 曾布置交叉移植实验（codex 二进制植入本 App 宿主），
+   chronod 注册了探针但未触发其描述符抓取，结论未定。恢复后数据
+   通道无需改动（Swift 读取已按 容器 → 标准路径 → 回退 排序）。
 
-附带实测结论：
+诊断速查（供后续排查复用）：
 
-- **App Group 容器创建需要 profile**：即使主应用带 groups entitlement 且为
-  真实团队签名，无 profile 时 `~/Library/Group Containers/<group>` 创建仍被
-  系统拒绝（EPERM），快照回退到 `~/Library/Application Support/com.syn.todolite/widget/`；
-- profile 免费账号仅能经 Xcode 工程（自动签名）生成，本仓库无 Xcode 工程；
-- 分发包（CI dmg / brew）不含小组件扩展（嵌入脚本不在 CI 流程中）；
-- 恢复路径 = Developer Program（Developer ID + 公证 + App Group profile）后，
-  在 `TodoLiteWidget.entitlements` 恢复标准形态（沙盒 + groups，文件内有注释），
-  Swift 读取代码按 容器 → 标准路径 → 回退 排序，无需改代码；
-- 刷新为 timeline 兜底（≤15 分钟），添加/移除小组件或等待兜底即可看到最新数据。
+- `pluginkit -m -i com.syn.todolite.widget`：注册状态（无输出 = 未注册）；
+- `log show --last 5m --predicate 'process == "chronod"' --info | grep todolite`：
+  看 `query completed / query failed` 判决（画廊是否收录的直接依据）；
+- `ls -t ~/Library/Logs/DiagnosticReports | grep TodoLiteWidget`：引导崩溃报告
+  （注意系统对重复崩溃限流，计数不增长不代表没崩，以 chronod 日志为准）。
 
 ## 5. Android AppWidget 小组件（✅ v1.2 已实现）
 

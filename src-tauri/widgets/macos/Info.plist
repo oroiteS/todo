@@ -16,10 +16,20 @@
 	<string>TodoLiteWidget</string>
 	<key>CFBundlePackageType</key>
 	<string>XPC!</string>
+	<key>CFBundleSupportedPlatforms</key>
+	<array>
+		<string>MacOSX</string>
+	</array>
+	<!-- 平台元数据：ExtensionKit 枚举需要，缺失会被索引阶段跳过（对照系统 shipping widget） -->
+	<key>DTPlatformName</key>
+	<string>macosx</string>
+	<key>DTPlatformVersion</key>
+	<string>14.0</string>
+	<!-- 版本由 scripts/build-macos-widget.sh 从主应用 Info.plist 同步写入（必须合法，否则枚举被拒） -->
 	<key>CFBundleShortVersionString</key>
-	<string>0.2.1</string>
+	<string>0.1.0</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>0.1.0</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>NSExtension</key>
