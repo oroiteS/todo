@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { ArrowUp, Plus } from "lucide-react";
 import { parseQuickAdd } from "@/core/quickparse";
+import { formatDue } from "@/core/dates";
 import { visibleLists } from "@/core/operations";
 import { useDataStore } from "@/stores/data";
 import { useUiStore } from "@/stores/ui";
@@ -56,47 +57,107 @@ export function QuickAdd({ currentListId }: { currentListId?: string }) {
 
   const canSubmit = text.trim().length > 0;
 
+  // 实时解析预览：让「明天 / 周五 / !高 / #列表」这些记号的效果所见即所得
+  const parsed = useMemo(
+    () => (text.trim() ? parseQuickAdd(text) : null),
+    [text],
+  );
+  const listHit = useMemo(() => {
+    if (!parsed?.listQuery) return null;
+    const q = parsed.listQuery.toLowerCase();
+    return (
+      lists.find((l) => l.name.toLowerCase() === q) ??
+      lists.find((l) => l.name.toLowerCase().startsWith(q)) ??
+      null
+    );
+  }, [parsed, lists]);
+  const showPreview =
+    !!parsed && (!!parsed.dueDate || !!parsed.priority || !!parsed.listQuery);
+
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
         submit();
       }}
-      className="mx-5 mb-2 flex shrink-0 items-center gap-2.5 rounded-xl border border-line bg-panel px-3.5 py-2.5 shadow-sm transition-all focus-within:border-accent/40 focus-within:shadow-[0_0_0_4px_var(--accent-soft)]"
+      className="mx-5 mb-2 shrink-0 rounded-xl border border-line bg-panel px-3.5 py-2.5 shadow-sm transition-all focus-within:border-accent/40 focus-within:shadow-[0_0_0_4px_var(--accent-soft)]"
     >
-      <Plus size={15} className="shrink-0 text-ink3" />
-      <input
-        ref={inputRef}
-        id="quick-add"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          // 输入法组词中的 Enter 是「确认候选词」，不是提交（安卓与桌面中文输入法皆是）
-          if (e.nativeEvent.isComposing || e.keyCode === 229) return;
-          if (e.key === "Enter") {
-            e.preventDefault();
-            submit();
-          }
-        }}
-        enterKeyHint="send"
-        autoComplete="off"
-        spellCheck={false}
-        placeholder="添加任务，回车保存（试试：明天 / 周五 / !高 / #列表）"
-        className="w-full bg-transparent text-sm outline-none placeholder:text-ink3/80"
-      />
-      <button
-        type="submit"
-        aria-label="添加任务"
-        disabled={!canSubmit}
-        className={cn(
-          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all",
-          canSubmit
-            ? "bg-accent text-white shadow-sm hover:brightness-110 active:[transform:scale(0.9)]"
-            : "bg-panel2 text-ink3",
-        )}
-      >
-        <ArrowUp size={14} strokeWidth={2.5} />
-      </button>
+      <div className="flex items-center gap-2.5">
+        <Plus size={15} className="shrink-0 text-ink3" />
+        <input
+          ref={inputRef}
+          id="quick-add"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            // 输入法组词中的 Enter 是「确认候选词」，不是提交（安卓与桌面中文输入法皆是）
+            if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+            if (e.key === "Enter") {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          enterKeyHint="send"
+          autoComplete="off"
+          spellCheck={false}
+          placeholder="添加任务，回车保存（例：明天 交作业 !高 #英语）"
+          className="w-full bg-transparent text-sm outline-none placeholder:text-ink3/80"
+        />
+        <button
+          type="submit"
+          aria-label="添加任务"
+          disabled={!canSubmit}
+          className={cn(
+            "flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all",
+            canSubmit
+              ? "bg-accent text-white shadow-sm hover:brightness-110 active:[transform:scale(0.9)]"
+              : "bg-panel2 text-ink3",
+          )}
+        >
+          <ArrowUp size={14} strokeWidth={2.5} />
+        </button>
+      </div>
+      {showPreview && parsed && (
+        // 语法速查：日期词在开头（今天/明天/后天/周X/下周X/M月D日/M/D），
+        // !低/!中/!高（或 !/!!/!!!）= 优先级，#列表名 = 加入已有列表
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-[25px] text-[11px]">
+          {parsed.dueDate && (
+            <span className="rounded-md bg-panel2/70 px-1.5 py-0.5 text-ink2">
+              到期 {formatDue(parsed.dueDate)}
+            </span>
+          )}
+          {parsed.priority != null && (
+            <span
+              className={cn(
+                "rounded-md bg-panel2/70 px-1.5 py-0.5",
+                parsed.priority === 3
+                  ? "text-danger"
+                  : parsed.priority === 2
+                    ? "text-warn"
+                    : "text-ink2",
+              )}
+            >
+              {parsed.priority === 3
+                ? "高优先级"
+                : parsed.priority === 2
+                  ? "中优先级"
+                  : "低优先级"}
+            </span>
+          )}
+          {parsed.listQuery && (
+            <span
+              className={cn(
+                "rounded-md bg-panel2/70 px-1.5 py-0.5",
+                listHit ? "text-ink2" : "text-ink3",
+              )}
+            >
+              {listHit
+                ? `加入「${listHit.name}」`
+                : `没有列表「${parsed.listQuery}」，将加入当前列表`}
+            </span>
+          )}
+        </div>
+      )}
     </form>
   );
 }
