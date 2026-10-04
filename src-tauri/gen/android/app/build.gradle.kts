@@ -63,6 +63,16 @@ android {
         versionCode = androidVersionCode
         versionName = androidVersionName
     }
+    // APK 命名与其他平台产物对齐(TodoLite_<版本>.apk),
+    // 替代 Gradle 默认的 app-universal-release.apk。
+    // 目前只构建 aarch64 一种 ABI;若将来按多 ABI 拆分,需要把 ABI 加进文件名防重名。
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val output = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output?.outputFileName = "TodoLite_${variant.versionName}.apk"
+        }
+    }
     signingConfigs {
         if (hasReleaseSigning) {
             create("release") {
