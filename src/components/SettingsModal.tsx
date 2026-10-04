@@ -133,12 +133,13 @@ function AppearanceSection() {
             </button>
           ))}
         </div>
-        {/* 色板：横向滚动，宽度固定为同屏恰好 3 个（82 = 3×20 圆点 + 2×6 间距 + 2×4 内边距），其余滑动查看 */}
+        {/* 色板：移动端固定同屏 7 个（184 = 7×20 圆点 + 6×6 间距 + 2×4 内边距）、
+            居中、横向滑动查看第 8 个；宽屏（≥640px）自然宽度与主题切换同行全展示 */}
         <div
           ref={accentScrollerRef}
-          className="w-[82px] shrink-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          className="mx-auto w-[184px] shrink-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:w-auto"
         >
-          <div className="flex w-max gap-1.5 p-1">
+          <div className="flex w-max items-center gap-1.5 p-1">
             {(Object.keys(ACCENTS) as AccentName[]).map((name) => (
               <button
                 key={name}
