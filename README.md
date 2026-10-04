@@ -6,7 +6,19 @@
 - **本地优先**：数据存在你自己的设备上，无账号、无追踪
 - **双通道同步**：WebDAV 网盘或 GitHub 私有仓库（HTTPS + Token，无需 SSH），任务级自动合并
 - **智能输入**：`明天 交报告 #工作 !高` 一行搞定日期 / 列表 / 优先级
-- **macOS 小组件**：WidgetKit 小组件展示「今日待办 + 高优先级任务」，数据经快照文件同步
+- **桌面小组件**：macOS（WidgetKit）与 Android（AppWidget）展示「今日待办 + 高优先级任务」，Android 端数据变更**实时刷新**
+
+## 开发状态（v0.3.0 · 2026-10）
+
+三端可用。Android 端近期集中打磨完毕，均已实机验证：
+
+- ✅ **移动端快速输入**——`<form>` 隐式提交 + 常驻提交按钮，软键盘"回车/完成"与中文输入法全兼容
+- ✅ **小组件实时刷新**——数据变更后 JNI 直调 `AppWidgetManager.updateAppWidget`（含 R8 keep 规则防裁剪，30 分钟系统轮询兜底）
+- ✅ **小组件美化**——≤4 条单列、>4 条自动两列（最多 2×4=8 条），彩色 □ 方框前缀（逾期红/今日灰/高优橙）、划线本式行线、超 6 字截断
+- ✅ **老 WebView / 模拟器兼容**——transform 全量采用经典写法（BlueStacks 等环境实测可用）
+- 🔜 **接下来**：macOS 小组件即时刷新（WidgetCenter 桥接）、任务提醒通知、子任务/标签
+
+完整版本历史见 [Releases](https://github.com/oroiteS/todo/releases)。
 
 ## 功能（v1 · 标准个人版）
 
@@ -180,6 +192,9 @@ Web 端 favicon 在 `public/`。生成提示词原文：
 - [x] macOS 小组件（WidgetKit）—— 今日待办 + 高优先级任务
 - [x] Android 小组件（AppWidget + RemoteViews）—— 同一快照通道，今日 + 高优先级
 - [x] Android 小组件即时刷新（写快照后 JNI 直调 AppWidgetManager.updateAppWidget）
+- [x] Android 小组件美化（两列自动布局 / 彩色方框 / 划线本行线 / 字数截断）
+- [x] 移动端快速输入适配（表单隐式提交 + 提交按钮，兼容软键盘与中文输入法）
+- [x] 老 WebView 兼容（transform 经典写法，覆盖 BlueStacks / 旧系统 WebView）
 - [ ] 小组件即时刷新（WidgetCenter.reloadTimelines 桥接）
 - [ ] 任务提醒系统通知
 - [ ] 子任务 / 重复任务 / 标签
