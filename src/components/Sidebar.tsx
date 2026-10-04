@@ -372,7 +372,10 @@ function ListRow(p: ListRowProps) {
       >
         <span
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[13px]"
-          style={{ background: `${p.list.color}22` }}
+          style={{
+            background: `${p.list.color}22`,
+            boxShadow: `inset 0 0 0 1px ${p.list.color}55`, // 同色描边：让外观里选的颜色看得出来
+          }}
         >
           {p.list.emoji}
         </span>

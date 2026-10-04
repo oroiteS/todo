@@ -98,9 +98,10 @@ export function DetailPane() {
           </button>
           <button
             type="button"
+            title="关闭"
             aria-label="关闭"
             onClick={() => selectTask(null)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-ink3 transition-colors hover:bg-panel2 hover:text-ink md:hidden"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-ink3 transition-colors hover:bg-panel2 hover:text-ink"
           >
             <X size={16} />
           </button>
@@ -172,7 +173,10 @@ export function DetailPane() {
         <div className="flex items-center gap-2">
           <span
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[13px]"
-            style={{ background: `${list?.color ?? "#57534e"}22` }}
+            style={{
+              background: `${list?.color ?? "#57534e"}22`,
+              boxShadow: `inset 0 0 0 1px ${list?.color ?? "#57534e"}55`,
+            }}
           >
             {list?.emoji ?? "❔"}
           </span>

@@ -49,6 +49,8 @@ export function TaskListPane() {
   let currentListId: string | undefined;
   let overdueCount = 0;
   let viewExists = true;
+  // 列表视图的页头彩色图标芯片（智能视图/回收站/搜索为 null）
+  let titleChip: { emoji: string; color: string } | null = null;
 
   if (searching) {
     mode = "search";
@@ -81,7 +83,8 @@ export function TaskListPane() {
     } else {
       currentListId = list.id;
       tasks = tasksInList(db, list.id);
-      title = `${list.emoji} ${list.name}`;
+      title = list.name;
+      titleChip = { emoji: list.emoji, color: list.color };
     }
   }
 
@@ -224,7 +227,21 @@ export function TaskListPane() {
     <main className="flex min-w-0 flex-1 flex-col">
       <header className="flex items-end justify-between gap-3 px-6 pb-3 pt-5">
         <div className="min-w-0">
-          <h1 className="truncate text-[22px] font-bold tracking-tight">{title}</h1>
+          <h1 className="flex items-center gap-2 truncate text-[22px] font-bold tracking-tight">
+            {titleChip && (
+              // 列表颜色的主要展示位：色底 + 同色描边（外观里选的颜色）
+              <span
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[17px]"
+                style={{
+                  background: `${titleChip.color}24`,
+                  boxShadow: `inset 0 0 0 1px ${titleChip.color}55`,
+                }}
+              >
+                {titleChip.emoji}
+              </span>
+            )}
+            <span className="truncate">{title}</span>
+          </h1>
           <p className="mt-0.5 text-[13px] text-ink2">{subtitle}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">

@@ -484,6 +484,10 @@ function GitHubForm() {
             autoComplete="off"
             spellCheck={false}
           />
+          <p className="mt-1 text-[11px] leading-relaxed text-ink3">
+            多人可共用同一仓库：每人填不同的文件路径（如 tom.json / jerry.json），
+            数据互不干扰、各自独立同步。
+          </p>
         </div>
         <div>
           <label className={labelCls}>访问 Token（PAT）</label>
