@@ -1,7 +1,7 @@
 // GitHub 同步后端：Contents API + Personal Access Token（HTTPS，三端一致，
 // 无需 SSH 密钥）。fine-grained PAT 只需「选中仓库 + Contents 读写」权限。
 
-import { httpFetch } from "./http";
+import { bodySnippet, httpFetch } from "./http";
 import {
   ConflictError,
   HttpSyncError,
@@ -35,17 +35,20 @@ function headers(token: string): Record<string, string> {
   };
 }
 
-function authError(res: { status: number }): never {
+function authError(res: { status: number; text: string }): never {
   if (res.status === 401) {
     throw new HttpSyncError("Token 无效或已过期（401）", 401);
   }
   if (res.status === 403) {
     throw new HttpSyncError(
-      "Token 权限不足（403）：fine-grained Token 需勾选该仓库的 Contents 读写权限",
+      `Token 权限不足（403）${bodySnippet(res.text)}：fine-grained Token 需勾选该仓库的 Contents 读写权限`,
       403,
     );
   }
-  throw new HttpSyncError(`GitHub 请求失败（HTTP ${res.status}）`, res.status);
+  throw new HttpSyncError(
+    `GitHub 请求失败（HTTP ${res.status}）${bodySnippet(res.text)}`,
+    res.status,
+  );
 }
 
 /** GET contents；404（仓库内无此文件）返回 null 表示首次同步 */

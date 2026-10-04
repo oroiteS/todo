@@ -1,7 +1,7 @@
 // WebDAV 同步后端：基于统一网络出口 sync/http（Tauri 命令，绕过 WebView CORS，
 // 支持自定义方法与代理）。使用最小操作集：GET / PUT(If-Match) / MKCOL / PROPFIND。
 
-import { httpFetch } from "./http";
+import { bodySnippet, httpFetch } from "./http";
 import { utf8ToBase64 } from "@/lib/base64";
 import { ConflictError, type SyncBackend } from "./backend";
 
@@ -45,18 +45,32 @@ function authHeaders(cfg: DavConfig): Record<string, string> {
   return { Authorization: `Basic ${utf8ToBase64Auth(`${cfg.username}:${cfg.password}`)}` };
 }
 
+function davError(res: { status: number; text: string }, action: string): DavError {
+  return new DavError(`${action}（HTTP ${res.status}）${bodySnippet(res.text)}`, res.status);
+}
+
 /** GET 文件；404 返回 null（首次同步） */
 export async function davGet(
   cfg: DavConfig,
   rel: string,
 ): Promise<{ text: string; etag: string | null } | null> {
-  const res = await httpFetch(fileUrl(cfg, rel), {
+  let res = await httpFetch(fileUrl(cfg, rel), {
     method: "GET",
     headers: authHeaders(cfg),
     timeoutMs: 20000,
   });
+  // 坚果云等对「父目录不存在」的 GET 返回 409 而非 404：
+  // 先补建目录再重试一次，仍失败才按错误处理
+  if (res.status === 409) {
+    await davEnsureDirectory(cfg);
+    res = await httpFetch(fileUrl(cfg, rel), {
+      method: "GET",
+      headers: authHeaders(cfg),
+      timeoutMs: 20000,
+    });
+  }
   if (res.status === 404) return null;
-  if (!res.ok) throw new DavError(`读取失败（HTTP ${res.status}）`, res.status);
+  if (!res.ok) throw davError(res, "读取失败");
   return { text: res.text, etag: res.headers.etag ?? null };
 }
 
@@ -81,7 +95,7 @@ export async function davPut(
   if (res.status === 412) {
     throw new DavError("远端数据已被其他设备修改，需要重新合并", 412);
   }
-  if (!res.ok) throw new DavError(`上传失败（HTTP ${res.status}）`, res.status);
+  if (!res.ok) throw davError(res, "上传失败");
   return { etag: res.headers.etag ?? null };
 }
 

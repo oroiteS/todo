@@ -240,7 +240,10 @@ pub async fn http_request(
         .map_err(|e| format!("无效的 HTTP 方法「{method}」: {e}"))?;
     let timeout = std::time::Duration::from_millis(timeout_ms.unwrap_or(20_000).clamp(1_000, 120_000));
 
-    let mut builder = reqwest::Client::builder().timeout(timeout);
+    let mut builder = reqwest::Client::builder()
+        .timeout(timeout)
+        // 不带 UA 的请求会被部分云服务商（如坚果云）的风控拦截
+        .user_agent(concat!("todolite/", env!("CARGO_PKG_VERSION")));
     match proxy_mode.as_deref() {
         Some("none") => builder = builder.no_proxy(),
         Some("manual") => {

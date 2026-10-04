@@ -86,3 +86,9 @@ export function httpFetch(
 ): Promise<HttpTextResponse> {
   return isTauri() ? tauriRequest(url, init) : browserRequest(url, init);
 }
+
+/** 把响应体压成一行、截断，用于拼进错误信息（服务端原话比状态码更能定位问题） */
+export function bodySnippet(text: string, max = 160): string {
+  const s = text.trim().replace(/\s+/g, " ").slice(0, max);
+  return s ? `：${s}` : "";
+}
