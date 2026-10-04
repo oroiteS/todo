@@ -227,7 +227,8 @@ export function Sidebar() {
                 confirmDelete={confirmDeleteId === l.id}
                 onRequestDelete={() => {
                   setConfirmDeleteId(l.id);
-                  setTimeout(() => setConfirmDeleteId((v) => (v === l.id ? null : v)), 2600);
+                  // 原位切换为「确认删除？」后留 5s 确认窗口（触屏上重开菜单不现实）
+                  setTimeout(() => setConfirmDeleteId((v) => (v === l.id ? null : v)), 5000);
                 }}
                 onConfirmDelete={() => {
                   deleteList(l.id);
@@ -375,7 +376,7 @@ function ListRow(p: ListRowProps) {
           <button
             type="button"
             aria-label="列表操作"
-            className="flex h-5 w-5 items-center justify-center rounded text-ink3 opacity-0 transition-opacity hover:text-ink group-hover:opacity-100"
+            className="flex h-5 w-5 items-center justify-center rounded text-ink3 transition-opacity hover:text-ink focus-visible:opacity-100 opacity-100 md:opacity-0 md:group-hover:opacity-100"
             onClick={(e) => {
               e.stopPropagation();
               toggle();
@@ -414,12 +415,12 @@ function ListRow(p: ListRowProps) {
                 }}
               />
             ) : (
+              // 不 close()：菜单内原位切换为「确认删除？」（触屏上重开菜单不现实）
               <MenuItem
                 icon={<Trash2 size={13} />}
                 label="移入回收站"
                 danger
                 onClick={() => {
-                  close();
                   p.onRequestDelete();
                 }}
               />

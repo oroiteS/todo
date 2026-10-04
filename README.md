@@ -8,7 +8,7 @@
 - **智能输入**：`明天 交报告 #工作 !高` 一行搞定日期 / 列表 / 优先级
 - **桌面小组件**：Android（AppWidget）展示「今日待办 + 高优先级任务」，数据变更**实时刷新**；macOS 端（WidgetKit）已开发但被系统枚举阻塞暂不可用（[docs/widget-adaptation.md](docs/widget-adaptation.md) §4.5）
 
-## 开发状态（v0.4.2 · 2026-10）
+## 开发状态（v0.4.3 · 2026-10）
 
 三端可用。Android 端近期集中打磨完毕，均已实机验证：
 
@@ -18,6 +18,7 @@
 - ✅ **老 WebView / 模拟器兼容**——transform 全量采用经典写法（BlueStacks 等环境实测可用）
 - ✅ **设置页外观（v0.4.1）**——窄屏主题切换独占一行不再被色板挤压溢出，色板同屏 7 个居中、可滑动
 - ✅ **收集箱多设备去重（v0.4.2）**——新设备收集箱改用固定 id；同步/本地加载时自动把多个同名收集箱合并为一个（保留最早创建的，任务全部并入，重复项以墓碑删除并随同步传播）
+- ✅ **移动端列表操作入口（v0.4.3）**——列表的改名/外观/删除菜单在触屏上不再隐藏（原为纯 hover 显示）；删除确认改为菜单内原位二次确认
 - ✅ **同步代理（v0.3.1）**——不走代理 / 自动检测 / 指定代理（HTTP、SOCKS5），WebDAV 与 GitHub 同步均生效
 - ✅ **坚果云 409 兼容（v0.3.2）**——HTTP 请求补 User-Agent（无 UA 会被部分云服务风控拦截）；GET 409 视为父目录缺失自动补建重试；错误信息携带服务端响应原文
 - ✅ **Linux 构建（v0.4.0）**——AppImage / deb / rpm 三产物（ubuntu-22.04 打包保证兼容性），托盘缺失自动降级为普通窗口
@@ -53,16 +54,18 @@
 ## 安装（Homebrew · macOS）
 
 ```bash
-brew install --cask --no-quarantine oroiteS/tap/todolite
+brew install --cask oroiteS/tap/todolite
+xattr -dr com.apple.quarantine /Applications/TodoLite.app
 ```
 
 该命令自动 tap [oroiteS/homebrew-tap](https://github.com/oroiteS/homebrew-tap)
 并安装 Release 中的 dmg（Apple Silicon / Intel 自动选择对应架构）。
 
 > [!NOTE]
-> 应用尚未做 Apple 签名与公证（见 Roadmap），`--no-quarantine` 用于跳过
-> Gatekeeper 隔离标记；若不带该参数安装、首次打开提示「已损坏」，运行
-> `xattr -dr com.apple.quarantine /Applications/TodoLite.app` 即可。
+> 应用尚未做 Apple 签名与公证（见 Roadmap）。brew 7 已移除 `--no-quarantine`
+> 选项（Homebrew 4.7.0 起弃用），无法在安装时跳过隔离标记，所以安装后
+> **就是要执行一次 `xattr -dr com.apple.quarantine /Applications/TodoLite.app`**
+> 去掉 Gatekeeper 隔离标记，否则首次打开会提示「已损坏」。
 
 cask 由 tap 仓库的定时 workflow 跟随最新 Release 自动更新 `version` 与 `sha256`，
 之后跟随新版本发布即可：
