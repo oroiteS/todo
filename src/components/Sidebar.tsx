@@ -91,6 +91,8 @@ export function Sidebar() {
   const [renameText, setRenameText] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [appearanceId, setAppearanceId] = useState<string | null>(null);
+  // 右键 / 长按打开的列表菜单（受控 Dropdown）
+  const [menuListId, setMenuListId] = useState<string | null>(null);
 
   const counts = useMemo(() => countByList(db), [db]);
   const lists = useMemo(() => visibleLists(db), [db]);
@@ -239,6 +241,10 @@ export function Sidebar() {
                 onAppearanceOpenChange={(open) =>
                   setAppearanceId(open ? l.id : null)
                 }
+                menuOpen={menuListId === l.id}
+                onMenuOpenChange={(open) =>
+                  setMenuListId((cur) => (open ? l.id : cur === l.id ? null : cur))
+                }
                 onPickEmoji={(emoji) => updateList(l.id, { emoji })}
                 onPickColor={(color) => updateList(l.id, { color })}
               />
@@ -310,6 +316,9 @@ interface ListRowProps {
   onConfirmDelete(): void;
   appearanceOpen: boolean;
   onAppearanceOpenChange(open: boolean): void;
+  /** 右键 / 长按打开操作菜单（受控 Dropdown） */
+  menuOpen: boolean;
+  onMenuOpenChange(open: boolean): void;
   onPickEmoji(emoji: string): void;
   onPickColor(color: string): void;
 }
@@ -346,6 +355,11 @@ function ListRow(p: ListRowProps) {
 
   return (
     <div
+      onContextMenu={(e) => {
+        // 桌面右键 / 移动端长按：打开列表操作菜单（屏蔽 WebView 默认菜单）
+        e.preventDefault();
+        p.onMenuOpenChange(!p.menuOpen);
+      }}
       className={cn(
         "group flex items-center gap-2.5 rounded-xl px-2 py-[7px] text-sm transition-all duration-150",
         p.active
@@ -372,6 +386,8 @@ function ListRow(p: ListRowProps) {
 
       <Dropdown
         align="right"
+        open={p.menuOpen}
+        onOpenChange={p.onMenuOpenChange}
         trigger={({ toggle }) => (
           <button
             type="button"

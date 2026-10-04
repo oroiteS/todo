@@ -34,6 +34,19 @@ export default function App() {
     [],
   );
 
+  // 屏蔽 WebView 默认右键菜单（只有「重新加载」，纯误导）；
+  // 输入框/文本域保留系统菜单（复制/粘贴/查询）。
+  // 任务行与列表行有自己的右键菜单（移动端长按等同）。
+  useEffect(() => {
+    const onCtx = (e: MouseEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el?.closest("input, textarea, [contenteditable='true']")) return;
+      e.preventDefault();
+    };
+    window.addEventListener("contextmenu", onCtx);
+    return () => window.removeEventListener("contextmenu", onCtx);
+  }, []);
+
   // 全局快捷键
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
