@@ -7,6 +7,7 @@ import {
   useState,
   type RefObject,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   CalendarDays,
   Check,
@@ -531,7 +532,10 @@ function AppearancePicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
+  // ⚠️ 必须 Portal 到 body：桌面端 <aside> 常驻 transform:translateX(0)（抽屉兼容
+  // 老 WebView 的写法），CSS 规定 transform 祖先会成为后代 fixed 的包含块——
+  // 不 Portal 的话遮罩只盖住侧栏、面板被主区待办行盖住且点外部关不掉。
+  return createPortal(
     // 半透明遮罩：点任意空白处关闭；桌面端保持通透不挡视线
     <div
       className="fade-in fixed inset-0 z-50 bg-black/25 backdrop-blur-[2px] md:bg-transparent md:backdrop-blur-none"
@@ -606,6 +610,7 @@ function AppearancePicker({
           ))}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
