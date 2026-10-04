@@ -1,11 +1,173 @@
-import { useMemo, useRef, useState } from "react";
-import { ArrowUp, Plus } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { ArrowUp, CircleHelp, Plus } from "lucide-react";
 import { parseQuickAdd } from "@/core/quickparse";
 import { formatDue } from "@/core/dates";
 import { visibleLists } from "@/core/operations";
 import { useDataStore } from "@/stores/data";
 import { useUiStore } from "@/stores/ui";
 import { cn } from "@/lib/cn";
+
+/** 行内记号样式（语法教程里的按键帽） */
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <code className="rounded border border-line bg-panel2/70 px-1 py-px text-[11px] text-ink">
+      {children}
+    </code>
+  );
+}
+
+/**
+ * 快速输入语法教程：输入框右侧 ? 按钮点击弹出（移动端无 hover，必须点按）。
+ * Portal 到 body：避免任何祖先的 transform/backdrop-filter 把 fixed 面板带偏。
+ */
+function HelpPopover() {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+
+  // 定位：按钮下方、右缘对齐输入框，视口内钳制（老 WebView 可用，无 floating-ui）
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const btn = btnRef.current;
+      const panel = panelRef.current;
+      if (!btn || !panel) return;
+      const r = btn.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const M = 8;
+      const pw = panel.offsetWidth;
+      const ph = panel.offsetHeight;
+      let left = Math.min(Math.max(M, r.right - pw), Math.max(M, vw - pw - M));
+      let top = r.bottom + 8;
+      if (top + ph > vh - M) top = Math.max(M, r.top - ph - 8);
+      setPos({ left, top });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open]);
+
+  // 点击外部 / Esc 关闭
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (panelRef.current?.contains(t) || btnRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        aria-label="快速输入教程"
+        aria-expanded={open}
+        title="输入格式帮助"
+        className={cn(
+          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink3 transition-colors hover:bg-panel2 hover:text-ink",
+          open && "bg-panel2 text-ink",
+        )}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <CircleHelp size={14} />
+      </button>
+      {open &&
+        createPortal(
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-label="快速输入教程"
+            className="pop-in fixed z-50 w-[min(21rem,calc(100vw-1rem))] rounded-xl border border-line bg-panel p-3.5 shadow-xl shadow-black/10"
+            style={{
+              left: pos?.left ?? 0,
+              top: pos?.top ?? 0,
+              visibility: pos ? undefined : "hidden",
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setOpen(false);
+            }}
+          >
+            <p className="text-[13px] font-semibold text-ink">快速输入语法</p>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-ink3">
+              在输入框里混写这些记号，回车自动解析（记号会从标题中剔除，
+              输入时下方会实时预览）。
+            </p>
+
+            <section className="mt-2.5">
+              <p className="text-[11px] font-semibold tracking-widest text-ink3">
+                到期日 · 写在开头
+              </p>
+              <ul className="mt-1 space-y-1 text-[12px] leading-relaxed text-ink2">
+                <li>
+                  <Kbd>今天</Kbd> <Kbd>明天</Kbd> <Kbd>后天</Kbd> <Kbd>大后天</Kbd>
+                </li>
+                <li>
+                  <Kbd>周五</Kbd> 本周（已过顺延）· <Kbd>下周三</Kbd> 下个自然周
+                </li>
+                <li>
+                  <Kbd>10月8日</Kbd> · <Kbd>10/8</Kbd>（无年份，已过自动顺延一年）
+                </li>
+                <li>
+                  <Kbd>2026/10/8</Kbd> · <Kbd>2026-10-8</Kbd> ·{" "}
+                  <Kbd>2026年10月8日</Kbd>（指定年份，不顺延）
+                </li>
+                <li>
+                  可紧贴标题：<Kbd>明天交报告</Kbd>
+                </li>
+              </ul>
+            </section>
+
+            <section className="mt-2.5">
+              <p className="text-[11px] font-semibold tracking-widest text-ink3">
+                优先级
+              </p>
+              <p className="mt-1 text-[12px] leading-relaxed text-ink2">
+                <Kbd>!低</Kbd> <Kbd>!中</Kbd> <Kbd>!高</Kbd> 或{" "}
+                <Kbd>!</Kbd> <Kbd>!!</Kbd> <Kbd>!!!</Kbd>
+                ；全角 <Kbd>！高</Kbd> <Kbd>！！</Kbd> 同样有效
+              </p>
+            </section>
+
+            <section className="mt-2.5">
+              <p className="text-[11px] font-semibold tracking-widest text-ink3">
+                列表
+              </p>
+              <p className="mt-1 text-[12px] leading-relaxed text-ink2">
+                <Kbd>#英语</Kbd>（全角 <Kbd>＃英语</Kbd> 也可）：精确/前缀匹配已有列表，
+                匹配不到则加入当前列表
+              </p>
+            </section>
+
+            <div className="mt-2.5 rounded-lg bg-panel2/60 p-2">
+              <p className="text-[10px] font-semibold tracking-widest text-ink3">
+                示例
+              </p>
+              <ul className="mt-1 space-y-0.5 text-[12px] text-ink">
+                <li>明天 交作业 !高 #英语</li>
+                <li>周五 组会 !!</li>
+                <li>2026/10/8 体检</li>
+              </ul>
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
 
 /**
  * 智能快速输入：
@@ -104,6 +266,8 @@ export function QuickAdd({ currentListId }: { currentListId?: string }) {
           placeholder="添加任务，回车保存（例：明天 交作业 !高 #英语）"
           className="w-full bg-transparent text-sm outline-none placeholder:text-ink3/80"
         />
+        {/* 输入格式帮助：放输入框与提交按钮之间，见即知是关于输入的 */}
+        <HelpPopover />
         <button
           type="submit"
           aria-label="添加任务"
