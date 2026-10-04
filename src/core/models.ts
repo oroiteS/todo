@@ -56,6 +56,17 @@ export interface GitHubSyncConfig {
 
 export type ThemeMode = "system" | "light" | "dark";
 
+/** 网络代理模式：none 不走代理 / auto 自动检测（系统+环境变量）/ manual 指定代理 */
+export type ProxyMode = "none" | "auto" | "manual";
+
+export interface ProxyConfig {
+  mode: ProxyMode;
+  /** mode === "manual" 时生效：http(s)://… 或 socks5://… */
+  url: string;
+}
+
+export const DEFAULT_PROXY: ProxyConfig = { mode: "auto", url: "" };
+
 export type SyncBackendKind = "webdav" | "github";
 
 export type AccentName =
@@ -82,6 +93,8 @@ export const ACCENTS: Record<AccentName, string> = {
 export interface Settings {
   theme: ThemeMode;
   accent: AccentName;
+  /** 网络代理（作用于同步请求） */
+  proxy: ProxyConfig;
   /** 当前使用的同步后端 */
   syncBackend: SyncBackendKind;
   /** WebDAV 配置（密码不在此处，存系统凭据管理器） */

@@ -15,6 +15,10 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-http = "2"
+# 统一同步 HTTP 出口（commands.rs http_request）：
+# 与 tauri-plugin-http 共用同一 reqwest（feature 取并集，不增加编译产物），
+# 追加 socks 支持 socks5 代理；system-proxy 供「自动检测」读取 Windows/macOS 系统代理。
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "charset", "system-proxy", "socks"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 log = "0.4"

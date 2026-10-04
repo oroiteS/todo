@@ -1,7 +1,7 @@
-// WebDAV 同步后端：基于 @tauri-apps/plugin-http（绕过 WebView CORS，支持自定义方法）。
-// 使用最小操作集：GET / PUT(If-Match) / MKCOL / PROPFIND。
+// WebDAV 同步后端：基于统一网络出口 sync/http（Tauri 命令，绕过 WebView CORS，
+// 支持自定义方法与代理）。使用最小操作集：GET / PUT(If-Match) / MKCOL / PROPFIND。
 
-import { fetch } from "@tauri-apps/plugin-http";
+import { httpFetch } from "./http";
 import { utf8ToBase64 } from "@/lib/base64";
 import { ConflictError, type SyncBackend } from "./backend";
 
@@ -45,28 +45,19 @@ function authHeaders(cfg: DavConfig): Record<string, string> {
   return { Authorization: `Basic ${utf8ToBase64Auth(`${cfg.username}:${cfg.password}`)}` };
 }
 
-function timeoutSignal(ms = 20000): AbortSignal | undefined {
-  try {
-    return AbortSignal.timeout(ms);
-  } catch {
-    return undefined;
-  }
-}
-
 /** GET 文件；404 返回 null（首次同步） */
 export async function davGet(
   cfg: DavConfig,
   rel: string,
 ): Promise<{ text: string; etag: string | null } | null> {
-  const res = await fetch(fileUrl(cfg, rel), {
+  const res = await httpFetch(fileUrl(cfg, rel), {
     method: "GET",
     headers: authHeaders(cfg),
-    signal: timeoutSignal(),
+    timeoutMs: 20000,
   });
   if (res.status === 404) return null;
   if (!res.ok) throw new DavError(`读取失败（HTTP ${res.status}）`, res.status);
-  const text = await res.text();
-  return { text, etag: res.headers.get("etag") };
+  return { text: res.text, etag: res.headers.etag ?? null };
 }
 
 /** PUT 文件；412 表示远端已被其他人修改（乐观锁冲突） */
@@ -81,17 +72,17 @@ export async function davPut(
     "Content-Type": "application/json; charset=utf-8",
     ...(ifMatch ? { "If-Match": ifMatch } : {}),
   };
-  const res = await fetch(fileUrl(cfg, rel), {
+  const res = await httpFetch(fileUrl(cfg, rel), {
     method: "PUT",
     headers,
     body,
-    signal: timeoutSignal(),
+    timeoutMs: 20000,
   });
   if (res.status === 412) {
     throw new DavError("远端数据已被其他设备修改，需要重新合并", 412);
   }
   if (!res.ok) throw new DavError(`上传失败（HTTP ${res.status}）`, res.status);
-  return { etag: res.headers.get("etag") };
+  return { etag: res.headers.etag ?? null };
 }
 
 /** 逐级 MKCOL 创建远程目录；已存在（405）视为成功 */
@@ -101,10 +92,10 @@ export async function davEnsureDirectory(cfg: DavConfig): Promise<void> {
   for (const seg of segments) {
     acc += `/${seg}`;
     try {
-      const res = await fetch(`${acc}/`, {
+      const res = await httpFetch(`${acc}/`, {
         method: "MKCOL",
         headers: authHeaders(cfg),
-        signal: timeoutSignal(),
+        timeoutMs: 20000,
       });
       if (res.ok || res.status === 405 || res.status === 301 || res.status === 409) {
         continue;
@@ -126,19 +117,19 @@ export async function davTest(
 ): Promise<{ ok: boolean; message: string }> {
   const base = normalizeBaseUrl(cfg.url);
   try {
-    const res = await fetch(`${base}/`, {
+    const res = await httpFetch(`${base}/`, {
       method: "PROPFIND",
       headers: { ...authHeaders(cfg), Depth: "0" },
-      signal: timeoutSignal(12000),
+      timeoutMs: 12000,
     });
     if (res.ok || res.status === 207) return { ok: true, message: "连接成功" };
     if (res.status === 401) return { ok: false, message: "账号或密码错误（401）" };
     if (res.status === 403) return { ok: false, message: "服务器拒绝访问（403）" };
     // 部分服务器对根路径 PROPFIND 有限制，回退 GET 验证
-    const res2 = await fetch(base, {
+    const res2 = await httpFetch(base, {
       method: "GET",
       headers: authHeaders(cfg),
-      signal: timeoutSignal(12000),
+      timeoutMs: 12000,
     });
     if (res2.status === 401) return { ok: false, message: "账号或密码错误（401）" };
     if (res2.ok) return { ok: true, message: "连接成功" };

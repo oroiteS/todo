@@ -192,3 +192,98 @@ pub fn platform_info(app: tauri::AppHandle) -> Result<PlatformInfo, String> {
         app_version: app.package_info().version.to_string(),
     })
 }
+
+// ---------- 统一 HTTP 出口（同步层专用，支持代理三模式） ----------
+//
+// tauri-plugin-http 的 fetch 只能"叠加"代理、无法强制直连（no_proxy），
+// 因此同步请求统一走本命令，由这里精确控制代理行为：
+//   none   不走代理：reqwest no_proxy()，无视系统/环境变量代理
+//   auto   自动检测：reqwest 默认行为（HTTP_PROXY/HTTPS_PROXY/ALL_PROXY 环境变量，
+//          以及 Windows / macOS 系统网络代理设置，需 reqwest system-proxy 特性）
+//   manual 指定代理：显式 Proxy::all(url)，支持 http(s):// 与 socks5://
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HttpTextResponse {
+    pub status: u16,
+    pub ok: bool,
+    /// 响应头（键统一小写，同名头后者覆盖）
+    pub headers: Vec<(String, String)>,
+    pub body: String,
+    /// 跟随重定向后的最终 URL
+    pub final_url: String,
+}
+
+fn friendly_net_err(e: &reqwest::Error) -> String {
+    if e.is_timeout() {
+        "请求超时".to_string()
+    } else if e.is_connect() {
+        format!("连接失败：{e}")
+    } else if e.is_redirect() {
+        format!("重定向次数过多：{e}")
+    } else {
+        format!("网络错误：{e}")
+    }
+}
+
+#[tauri::command]
+pub async fn http_request(
+    method: String,
+    url: String,
+    headers: Vec<(String, String)>,
+    body: Option<String>,
+    timeout_ms: Option<u64>,
+    proxy_mode: Option<String>,
+    proxy_url: Option<String>,
+) -> Result<HttpTextResponse, String> {
+    let m = reqwest::Method::from_bytes(method.to_ascii_uppercase().as_bytes())
+        .map_err(|e| format!("无效的 HTTP 方法「{method}」: {e}"))?;
+    let timeout = std::time::Duration::from_millis(timeout_ms.unwrap_or(20_000).clamp(1_000, 120_000));
+
+    let mut builder = reqwest::Client::builder().timeout(timeout);
+    match proxy_mode.as_deref() {
+        Some("none") => builder = builder.no_proxy(),
+        Some("manual") => {
+            let proxy = proxy_url.as_deref().unwrap_or("").trim();
+            if proxy.is_empty() {
+                return Err("已选择「指定代理」但未填写代理地址".to_string());
+            }
+            let p = reqwest::Proxy::all(proxy).map_err(|e| format!("代理地址无效「{proxy}」: {e}"))?;
+            builder = builder.proxy(p);
+        }
+        // auto / 未设置：reqwest 默认 = 环境变量 + 系统代理
+        _ => {}
+    }
+    let client = builder.build().map_err(|e| format!("HTTP 客户端初始化失败：{e}"))?;
+
+    let mut req = client.request(m, &url);
+    for (k, v) in &headers {
+        req = req.header(k, v);
+    }
+    if let Some(b) = body {
+        req = req.body(b);
+    }
+
+    let res = req.send().await.map_err(|e| friendly_net_err(&e))?;
+    let status = res.status().as_u16();
+    let final_url = res.url().to_string();
+    let mut hs: Vec<(String, String)> = Vec::with_capacity(res.headers().len());
+    for (k, v) in res.headers() {
+        if let Ok(val) = v.to_str() {
+            let key = k.as_str().to_ascii_lowercase();
+            if let Some(entry) = hs.iter_mut().find(|(ek, _)| *ek == key) {
+                entry.1 = val.to_string();
+            } else {
+                hs.push((key, val.to_string()));
+            }
+        }
+    }
+    let text = res.text().await.map_err(|e| friendly_net_err(&e))?;
+    Ok(HttpTextResponse {
+        ok: (200..300).contains(&status),
+        status,
+        headers: hs,
+        body: text,
+        final_url,
+    })
+}

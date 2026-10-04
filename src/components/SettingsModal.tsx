@@ -6,12 +6,18 @@ import {
   Database,
   Download,
   Github,
+  Globe,
   Loader2,
   Palette,
   RefreshCw,
   X,
 } from "lucide-react";
-import { ACCENTS, type AccentName, type ThemeMode } from "@/core/models";
+import {
+  ACCENTS,
+  type AccentName,
+  type ProxyMode,
+  type ThemeMode,
+} from "@/core/models";
 import { davTest } from "@/sync/webdav";
 import { ghTest } from "@/sync/github";
 import { useDataStore } from "@/stores/data";
@@ -55,6 +61,7 @@ export function SettingsModal() {
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
           <AppearanceSection />
           <SyncSection />
+          <ProxySection />
           <DataSection />
           <AboutSection />
         </div>
@@ -106,8 +113,10 @@ function AppearanceSection() {
 
   return (
     <Card icon={<Palette size={14} />} title="外观">
-      <div className="flex items-center gap-3">
-        <div className="flex min-w-0 flex-1 rounded-xl bg-panel2 p-1">
+      {/* 窄屏（手机）竖排，避免主题切换被色板挤压溢出；宽屏保持一行 */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
+        {/* 主题切换：跟随系统 / 浅色 / 深色 始终同框，不被压缩出框 */}
+        <div className="flex rounded-xl bg-panel2 p-1 sm:min-w-0 sm:flex-1">
           {THEMES.map((t) => (
             <button
               key={t.value}
@@ -124,10 +133,10 @@ function AppearanceSection() {
             </button>
           ))}
         </div>
-        {/* 色板:横向滚动,同屏约 4 个,把宽度留给左侧主题切换 */}
+        {/* 色板：横向滚动，宽度固定为同屏恰好 3 个（82 = 3×20 圆点 + 2×6 间距 + 2×4 内边距），其余滑动查看 */}
         <div
           ref={accentScrollerRef}
-          className="w-[106px] shrink-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          className="w-[82px] shrink-0 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         >
           <div className="flex w-max gap-1.5 p-1">
             {(Object.keys(ACCENTS) as AccentName[]).map((name) => (
@@ -501,6 +510,85 @@ function GitHubForm() {
         认证走 HTTPS，三端配置方式完全相同，无需配置 SSH 密钥；Token 只存本机系统凭据管理器。
       </p>
     </div>
+  );
+}
+
+// ---------- 代理 ----------
+
+const PROXY_OPTIONS: Array<{ value: ProxyMode; label: string }> = [
+  { value: "none", label: "不走代理" },
+  { value: "auto", label: "自动检测" },
+  { value: "manual", label: "指定代理" },
+];
+
+function ProxySection() {
+  const proxy = useDataStore((s) => s.db.settings.proxy);
+  const updateSettings = useDataStore((s) => s.updateSettings);
+  const mode: ProxyMode = proxy?.mode ?? "auto";
+  const [url, setUrl] = useState(proxy?.url ?? "");
+  const urlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // URL 输入防抖提交，避免逐键触发自动同步
+  const onUrlChange = (v: string) => {
+    setUrl(v);
+    if (urlTimer.current) clearTimeout(urlTimer.current);
+    urlTimer.current = setTimeout(() => {
+      updateSettings({ proxy: { mode, url: v.trim() } });
+    }, 600);
+  };
+  const commitUrl = () => {
+    if (urlTimer.current) {
+      clearTimeout(urlTimer.current);
+      urlTimer.current = null;
+    }
+    updateSettings({ proxy: { mode, url: url.trim() } });
+  };
+  const setMode = (m: ProxyMode) => {
+    commitUrl();
+    updateSettings({ proxy: { mode: m, url: url.trim() } });
+  };
+
+  return (
+    <Card icon={<Globe size={14} />} title="代理">
+      <div className="flex rounded-xl bg-panel2 p-1">
+        {PROXY_OPTIONS.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => setMode(o.value)}
+            className={cn(
+              "flex-1 whitespace-nowrap rounded-lg px-2 py-1.5 text-[13px] transition-all",
+              mode === o.value
+                ? "bg-panel font-medium shadow-sm"
+                : "text-ink2 hover:text-ink",
+            )}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      {mode === "manual" && (
+        <div className="mt-3">
+          <label className={labelCls}>代理地址</label>
+          <input
+            className={inputCls}
+            value={url}
+            onChange={(e) => onUrlChange(e.target.value)}
+            onBlur={commitUrl}
+            placeholder="http://127.0.0.1:7890 或 socks5://127.0.0.1:1080"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          {!url.trim() && (
+            <p className="mt-1.5 text-xs text-danger">请填写代理地址，切换后用「测试连接」验证</p>
+          )}
+        </div>
+      )}
+      <p className="mt-2.5 text-[11px] leading-relaxed text-ink3">
+        仅作用于同步请求。自动检测：读取环境变量（HTTP_PROXY / HTTPS_PROXY / ALL_PROXY）
+        及 Windows、macOS 系统代理设置；Android 无系统代理可读，一般请选「指定代理」。
+      </p>
+    </Card>
   );
 }
 

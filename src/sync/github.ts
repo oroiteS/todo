@@ -1,7 +1,7 @@
 // GitHub 同步后端：Contents API + Personal Access Token（HTTPS，三端一致，
 // 无需 SSH 密钥）。fine-grained PAT 只需「选中仓库 + Contents 读写」权限。
 
-import { fetch } from "@tauri-apps/plugin-http";
+import { httpFetch } from "./http";
 import {
   ConflictError,
   HttpSyncError,
@@ -35,15 +35,7 @@ function headers(token: string): Record<string, string> {
   };
 }
 
-function timeoutSignal(ms = 20000): AbortSignal | undefined {
-  try {
-    return AbortSignal.timeout(ms);
-  } catch {
-    return undefined;
-  }
-}
-
-function authError(res: Response): never {
+function authError(res: { status: number }): never {
   if (res.status === 401) {
     throw new HttpSyncError("Token 无效或已过期（401）", 401);
   }
@@ -64,14 +56,14 @@ export async function ghGetFile(
   if (!isValidRepo(cfg.repo)) {
     throw new HttpSyncError("仓库名格式应为 owner/repo", 400);
   }
-  const res = await fetch(
+  const res = await httpFetch(
     contentsApiUrl(GITHUB_API_BASE, cfg.repo, cfg.path, cfg.branch),
-    { method: "GET", headers: headers(token), signal: timeoutSignal() },
+    { method: "GET", headers: headers(token), timeoutMs: 20000 },
   );
   if (res.status === 404) return null;
   if (!res.ok) authError(res);
 
-  const data = (await res.json()) as {
+  const data = JSON.parse(res.text) as {
     content?: string | null;
     encoding?: string;
     sha?: string;
@@ -100,11 +92,11 @@ export async function ghPutFile(
   if (sha) body.sha = sha;
 
   const url = contentsApiUrl(GITHUB_API_BASE, cfg.repo, cfg.path);
-  const res = await fetch(url, {
+  const res = await httpFetch(url, {
     method: "PUT",
     headers: headers(token),
     body: JSON.stringify(body),
-    signal: timeoutSignal(30000),
+    timeoutMs: 30000,
   });
 
   if (res.status === 409 || res.status === 422) {
@@ -119,7 +111,7 @@ export async function ghPutFile(
   }
   if (!res.ok) authError(res);
 
-  const data = (await res.json()) as { content?: { sha?: string } };
+  const data = JSON.parse(res.text) as { content?: { sha?: string } };
   return { sha: data.content?.sha ?? sha ?? "" };
 }
 
@@ -132,10 +124,10 @@ export async function ghTest(
     return { ok: false, message: "仓库名格式应为 owner/repo" };
   }
   try {
-    const repoRes = await fetch(`${GITHUB_API_BASE}/repos/${cfg.repo}`, {
+    const repoRes = await httpFetch(`${GITHUB_API_BASE}/repos/${cfg.repo}`, {
       method: "GET",
       headers: headers(token),
-      signal: timeoutSignal(12000),
+      timeoutMs: 12000,
     });
     if (repoRes.status === 401) return { ok: false, message: "Token 无效或已过期（401）" };
     if (repoRes.status === 404) {
@@ -144,9 +136,9 @@ export async function ghTest(
     if (!repoRes.ok) {
       return { ok: false, message: `GitHub 响应 ${repoRes.status}` };
     }
-    const branchRes = await fetch(
+    const branchRes = await httpFetch(
       `${GITHUB_API_BASE}/repos/${cfg.repo}/branches/${encodeURIComponent(cfg.branch)}`,
-      { method: "GET", headers: headers(token), signal: timeoutSignal(12000) },
+      { method: "GET", headers: headers(token), timeoutMs: 12000 },
     );
     if (branchRes.status === 404) {
       return { ok: false, message: `分支 ${cfg.branch} 不存在，请在 GitHub 上创建（如 main）` };

@@ -22,6 +22,7 @@ import { getStorage } from "@/storage/adapters";
 import { widgetBridge } from "@/bridge/widget";
 import { applyTheme } from "@/lib/theme";
 import { setSyncHooks, syncNow } from "@/sync/engine";
+import { setProxyProvider } from "@/sync/http";
 import { githubBackend } from "@/sync/github";
 import { webdavBackend } from "@/sync/webdav";
 import { deleteSecret, getSecret } from "@/lib/secrets";
@@ -114,6 +115,9 @@ export const useDataStore = create<DataStore>((set, get) => {
       schedulePersist();
     },
   });
+
+  // 统一网络出口的代理配置来自设置（webdav/github 的所有请求经此读取）
+  setProxyProvider(() => get().db.settings.proxy);
 
   return {
     db: ops.emptyDatabase(),

@@ -15,6 +15,7 @@ pub fn run() {
             commands::delete_secret,
             widget::write_widget_snapshot,
             commands::platform_info,
+            commands::http_request,
         ])
         .setup(|app| {
             // 菜单栏图标（右上角常驻入口），仅桌面端

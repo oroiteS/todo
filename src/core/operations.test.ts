@@ -238,3 +238,30 @@ describe("normalizeDatabase / ensureInbox", () => {
     expect(db.lists).toHaveLength(1);
   });
 });
+
+describe("normalizeProxy", () => {
+  it("旧数据缺 proxy 字段时补默认值（自动检测）", () => {
+    const db = normalizeDatabase({ settings: { theme: "dark" } }, T0);
+    expect(db.settings.proxy).toEqual({ mode: "auto", url: "" });
+  });
+
+  it("保留合法配置并裁剪 url 空白", () => {
+    const db = normalizeDatabase(
+      { settings: { proxy: { mode: "manual", url: "  http://127.0.0.1:7890  " } } },
+      T0,
+    );
+    expect(db.settings.proxy).toEqual({ mode: "manual", url: "http://127.0.0.1:7890" });
+  });
+
+  it("非法 mode / 非字符串 url 回退默认", () => {
+    const db = normalizeDatabase(
+      { settings: { proxy: { mode: "hacked", url: 42 } } },
+      T0,
+    );
+    expect(db.settings.proxy).toEqual({ mode: "auto", url: "" });
+    expect(normalizeDatabase({ settings: { proxy: null } }, T0).settings.proxy).toEqual({
+      mode: "auto",
+      url: "",
+    });
+  });
+});

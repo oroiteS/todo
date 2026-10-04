@@ -6,7 +6,7 @@
 - **本地优先**：数据存在你自己的设备上，无账号、无追踪
 - **双通道同步**：WebDAV 网盘或 GitHub 私有仓库（HTTPS + Token，无需 SSH），任务级自动合并
 - **智能输入**：`明天 交报告 #工作 !高` 一行搞定日期 / 列表 / 优先级
-- **桌面小组件**：macOS（WidgetKit）与 Android（AppWidget）展示「今日待办 + 高优先级任务」，Android 端数据变更**实时刷新**
+- **桌面小组件**：Android（AppWidget）展示「今日待办 + 高优先级任务」，数据变更**实时刷新**；macOS 端（WidgetKit）已开发但被系统枚举阻塞暂不可用（[docs/widget-adaptation.md](docs/widget-adaptation.md) §4.5）
 
 ## 开发状态（v0.3.0 · 2026-10）
 
@@ -16,7 +16,8 @@
 - ✅ **小组件实时刷新**——数据变更后 JNI 直调 `AppWidgetManager.updateAppWidget`（含 R8 keep 规则防裁剪，30 分钟系统轮询兜底）
 - ✅ **小组件美化**——≤4 条单列、>4 条自动两列（最多 2×4=8 条），彩色 □ 方框前缀（逾期红/今日灰/高优橙）、划线本式行线、超 6 字截断
 - ✅ **老 WebView / 模拟器兼容**——transform 全量采用经典写法（BlueStacks 等环境实测可用）
-- 🔜 **接下来**：macOS 小组件即时刷新（WidgetCenter 桥接）、任务提醒通知、子任务/标签
+- ❌ **macOS 小组件被阻塞**——代码与快照通道已完成，但 swiftc 手工构建的 .appex 无法通过 macOS 27 的 WidgetKit 画廊枚举（chronod 拉起即崩，根因未定位；同机 ad-hoc 的 Xcode 构建扩展正常）。接口保留，恢复路径见 [docs](docs/widget-adaptation.md) §4.5
+- 🔜 **接下来**：任务提醒通知、子任务/标签
 
 完整版本历史见 [Releases](https://github.com/oroiteS/todo/releases)。
 
@@ -28,6 +29,7 @@
 - 搜索（`⌘K`）、拖拽排序、回收站（软删除，保留 30 天）
 - 深浅色主题（跟随系统）+ 8 种强调色
 - WebDAV 同步：手动 / 启动时 / 变更后防抖自动同步，任务级 LWW 合并 + 墓碑删除传播
+- 同步代理：不走代理 / 自动检测（系统 + 环境变量）/ 指定代理（HTTP、SOCKS5）
 - JSON 导入导出（设置页）
 
 ## 技术栈
@@ -40,7 +42,7 @@
 | 状态 | Zustand 5 |
 | 存储 | 单 JSON 数据文件，原子写 + 5 级备份轮转 |
 | 凭据 | 系统凭据管理器（Keychain / Windows 凭据管理器 / 应用私有目录） |
-| 同步 | WebDAV（`@tauri-apps/plugin-http`，ETag 乐观锁） |
+| 同步 | WebDAV（统一 Rust HTTP 出口，ETag 乐观锁） |
 | 测试 | Vitest（领域层纯函数单测） |
 
 ## 安装（Homebrew · macOS）
@@ -82,8 +84,11 @@ pnpm tauri build               # 先构建主应用
 scripts/build-macos-widget.sh  # swiftc 编译 WidgetKit 扩展并嵌入 .app
 ```
 
-打开应用后在 通知中心 → 编辑小组件 添加「今日待办」。原理与限制见
-[docs/widget-adaptation.md](docs/widget-adaptation.md)。
+> [!WARNING]
+> 2026-10-04 复测：当前产物**无法出现在小组件画廊**（chronod 描述符抓取阶段引导
+> 崩溃；免费签名并非阻碍——同机 ad-hoc 的 Xcode 构建扩展正常，详见
+> [docs/widget-adaptation.md](docs/widget-adaptation.md) 第 4.5 节）。
+> 脚本与接口保留，供后续改用 Xcode 工程构建扩展时恢复。
 
 ## Android
 
@@ -136,11 +141,25 @@ Token 只存系统凭据管理器。每次同步在仓库中就是一个真实 c
 （默认 `todolite-data.json`）历史完整可回溯；单文件上限 1MB（Contents API 限制，
 约数千条带备注的任务，正常个人使用远达不到）。
 
+### 网络代理
+
+设置 → 代理，仅作用于同步请求，三种模式：
+
+- **不走代理**：强制直连（无视系统代理与环境变量）
+- **自动检测**：读取环境变量（`HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY`）及
+  Windows、macOS 系统网络代理（默认）
+- **指定代理**：填 `http(s)://…` 或 `socks5://…` 地址；Android 端无系统代理可读，
+  需要代理时一般选这项
+
+切换后用同步通道的「测试连接」验证即可。
+
 ## 小组件
 
-macOS 已实现（WidgetKit，内容为**今日待办 + 高优先级任务**）：应用每次变更都会把
-「今日/逾期/高优任务摘要 + 计数」快照写到平台共享位置，小组件扩展读取渲染；
-构建方式与签名限制见 [docs/widget-adaptation.md](docs/widget-adaptation.md)。
+macOS **已开发、暂不可用**（WidgetKit，内容为**今日待办 + 高优先级任务**）：快照
+通道与扩展代码完整保留，但 swiftc 手工构建的 .appex 在 macOS 27 上无法通过
+WidgetKit 画廊枚举（chronod 拉起扩展时引导崩溃；同机 ad-hoc 的 Xcode 构建第三方
+组件正常，**免费签名并非阻碍**）。完整排查记录与恢复路径见
+[docs/widget-adaptation.md](docs/widget-adaptation.md) 第 4.5 节。
 
 Android 已实现（**标准 AppWidget + RemoteViews**，同一快照数据通道）：
 4x2 组件展示「今天 · N」标题（含红色逾期计数）+ 高优「❗ M」徽标；任务行
@@ -189,7 +208,7 @@ Web 端 favicon 在 `public/`。生成提示词原文：
 
 ## Roadmap
 
-- [x] macOS 小组件（WidgetKit）—— 今日待办 + 高优先级任务
+- [ ] macOS 小组件（WidgetKit）—— 代码与快照通道已完成；被 macOS 27 画廊枚举阻塞（swiftc 手搓 appex 引导崩溃，根因未定位，见 docs §4.5）。恢复路径：改用 Xcode 工程构建扩展
 - [x] Android 小组件（AppWidget + RemoteViews）—— 同一快照通道，今日 + 高优先级
 - [x] Android 小组件即时刷新（写快照后 JNI 直调 AppWidgetManager.updateAppWidget）
 - [x] Android 小组件美化（两列自动布局 / 彩色方框 / 划线本行线 / 字数截断）

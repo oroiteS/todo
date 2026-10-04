@@ -3909,6 +3909,7 @@ dependencies = [
  "jni",
  "keyring",
  "log",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "tauri",

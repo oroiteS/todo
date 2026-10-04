@@ -1,7 +1,7 @@
 // 领域操作：全部为 (db, ...) -> 新 db 的纯函数（不可变更新）。
 
-import type { Database, ID, Priority, Task, TaskList } from "./models";
-import { DEFAULT_INBOX_NAME } from "./models";
+import type { Database, ID, Priority, ProxyConfig, Task, TaskList } from "./models";
+import { DEFAULT_INBOX_NAME, DEFAULT_PROXY } from "./models";
 import { newId } from "./ids";
 import { todayStr, isToday, isOverdue, diffDays } from "./dates";
 
@@ -17,6 +17,7 @@ export function emptyDatabase(now: Date = new Date()): Database {
     settings: {
       theme: "system",
       accent: "rose",
+      proxy: { ...DEFAULT_PROXY },
       syncBackend: "webdav",
       webdav: null,
       github: null,
@@ -71,6 +72,7 @@ export function normalizeDatabase(raw: unknown, now: Date = new Date()): Databas
     db.settings = {
       theme: obj.settings.theme ?? "system",
       accent: obj.settings.accent ?? "rose",
+      proxy: normalizeProxy(obj.settings.proxy),
       syncBackend: obj.settings.syncBackend ?? "webdav",
       webdav: obj.settings.webdav ?? null,
       github: obj.settings.github ?? null,
@@ -78,6 +80,15 @@ export function normalizeDatabase(raw: unknown, now: Date = new Date()): Databas
     };
   }
   return db;
+}
+
+/** 兼容旧数据：proxy 字段缺失或不合法时回退默认（自动检测） */
+export function normalizeProxy(raw: unknown): ProxyConfig {
+  const p = (raw && typeof raw === "object" ? raw : {}) as Partial<ProxyConfig>;
+  return {
+    mode: p.mode === "none" || p.mode === "manual" ? p.mode : "auto",
+    url: typeof p.url === "string" ? p.url.trim() : "",
+  };
 }
 
 /** 首次启动：确保存在收集箱 */
