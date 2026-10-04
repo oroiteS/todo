@@ -1,4 +1,12 @@
-import { useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import {
   CalendarDays,
   Check,
@@ -316,6 +324,8 @@ interface ListRowProps {
 
 function ListRow(p: ListRowProps) {
   const setView = useUiStore((s) => s.setView);
+  // 外观弹层的定位锚点：弹层需贴着此行弹出（而非写死坐标）
+  const rowRef = useRef<HTMLDivElement>(null);
   if (p.renaming) {
     return (
       // form 隐式提交：兼容安卓输入法（同「新建列表」）
@@ -346,6 +356,7 @@ function ListRow(p: ListRowProps) {
 
   return (
     <div
+      ref={rowRef}
       className={cn(
         "group flex items-center gap-2.5 rounded-xl px-2 py-[7px] text-sm transition-all duration-150",
         p.active
@@ -431,6 +442,7 @@ function ListRow(p: ListRowProps) {
 
       {p.appearanceOpen && (
         <AppearancePicker
+          anchorRef={rowRef}
           list={p.list}
           onClose={() => p.onAppearanceOpenChange(false)}
           onPickEmoji={p.onPickEmoji}
@@ -441,22 +453,106 @@ function ListRow(p: ListRowProps) {
   );
 }
 
+/** 视口最小边距 / 弹层与锚点的间距 */
+const PICKER_MARGIN = 8;
+const PICKER_GAP = 8;
+
+/**
+ * 计算外观弹层在视口内的落点（纯函数，便于单测防回归：任何屏宽都不得溢出视口）。
+ * 首选贴在锚点右侧、顶对齐；右侧放不下翻到锚点左侧；下方放不下底对齐锚点；
+ * 最后钳制在视口内。
+ */
+export function pickerPos(
+  anchor: { left: number; top: number; right: number; bottom: number } | null,
+  pw: number,
+  ph: number,
+  vw: number,
+  vh: number,
+): { left: number; top: number } {
+  const M = PICKER_MARGIN;
+  const G = PICKER_GAP;
+  let left = anchor ? anchor.right + G : (vw - pw) / 2;
+  let top = anchor ? anchor.top : (vh - ph) / 2;
+  if (left + pw > vw - M) left = (anchor?.left ?? 0) - pw - G;
+  if (top + ph > vh - M) top = (anchor?.bottom ?? vh) - ph;
+  left = Math.min(Math.max(M, left), Math.max(M, vw - pw - M));
+  top = Math.min(Math.max(M, top), Math.max(M, vh - ph - M));
+  return { left, top };
+}
+
 function AppearancePicker({
+  anchorRef,
   list,
   onClose,
   onPickEmoji,
   onPickColor,
 }: {
+  /** 触发行（定位锚点） */
+  anchorRef: RefObject<HTMLDivElement | null>;
   list: TaskList;
   onClose(): void;
   onPickEmoji(emoji: string): void;
   onPickColor(color: string): void;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+
+  // 视口内定位（老 WebView 可用，无需 floating-ui）：见 pickerPos
+  const place = useCallback(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const anchor = anchorRef.current?.getBoundingClientRect() ?? null;
+    setPos(
+      pickerPos(
+        anchor,
+        panel.offsetWidth,
+        panel.offsetHeight,
+        window.innerWidth,
+        window.innerHeight,
+      ),
+    );
+  }, [anchorRef]);
+
+  useLayoutEffect(() => {
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [place]);
+
+  // 焦点管理：打开时聚焦面板（Esc 生效的前提），关闭后归还焦点
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    panelRef.current?.focus();
+    return () => {
+      const back =
+        prev && prev.isConnected ? prev : anchorRef.current;
+      back?.focus?.({ preventScroll: true });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-50" onClick={onClose}>
+    // 半透明遮罩：点任意空白处关闭；桌面端保持通透不挡视线
+    <div
+      className="fade-in fixed inset-0 z-50 bg-black/25 backdrop-blur-[2px] md:bg-transparent md:backdrop-blur-none"
+      onClick={onClose}
+    >
       <div
-        className="pop-in absolute left-72 top-40 w-60 rounded-xl border border-line bg-panel p-3 shadow-xl shadow-black/10"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="列表外观"
+        tabIndex={-1}
+        className="pop-in absolute w-72 max-w-[calc(100vw-1rem)] rounded-xl border border-line bg-panel p-3 shadow-xl shadow-black/10 outline-none md:w-60"
+        style={{
+          left: pos?.left ?? 0,
+          top: pos?.top ?? 0,
+          visibility: pos ? undefined : "hidden", // 首帧测量前不可见，避免闪跳
+        }}
         onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onClose();
+        }}
       >
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[11px] font-semibold tracking-widest text-ink3">
@@ -464,10 +560,11 @@ function AppearancePicker({
           </span>
           <button
             type="button"
-            className="text-ink3 hover:text-ink"
+            aria-label="关闭"
+            className="-m-1 flex h-7 w-7 items-center justify-center rounded-md text-ink3 transition-colors hover:bg-panel2 hover:text-ink"
             onClick={onClose}
           >
-            <X size={13} />
+            <X size={14} />
           </button>
         </div>
         <div className="grid grid-cols-6 gap-1">
@@ -475,10 +572,13 @@ function AppearancePicker({
             <button
               key={e}
               type="button"
+              aria-label={`图标 ${e}`}
+              aria-pressed={list.emoji === e}
               onClick={() => onPickEmoji(e)}
               className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-lg text-base transition-colors hover:bg-panel2",
-                list.emoji === e && "bg-accent-soft",
+                // 触屏 40px 起步，桌面收窄到 32px
+                "flex h-10 w-10 items-center justify-center rounded-lg text-lg transition-colors hover:bg-panel2 md:h-8 md:w-8 md:text-base",
+                list.emoji === e && "bg-accent-soft ring-1 ring-accent/40",
               )}
             >
               {e}
@@ -494,10 +594,12 @@ function AppearancePicker({
               key={c}
               type="button"
               aria-label={`颜色 ${c}`}
+              aria-pressed={list.color === c}
               onClick={() => onPickColor(c)}
               className={cn(
-                "h-6 w-6 rounded-full transition-transform hover:[transform:scale(1.1)]",
-                list.color === c && "ring-2 ring-ink/40 ring-offset-2 ring-offset-panel",
+                "h-8 w-8 rounded-full transition-transform hover:[transform:scale(1.1)] md:h-6 md:w-6",
+                list.color === c &&
+                  "ring-2 ring-ink/40 ring-offset-2 ring-offset-panel",
               )}
               style={{ background: c }}
             />
