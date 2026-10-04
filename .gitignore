@@ -23,6 +23,13 @@ src-tauri/gen/android/app/tauri.build.gradle.kts
 # 本地调研材料(不入库)
 android-widget-跨平台调研/
 widget_research/
+macOS组件开发与免签名可行性调研.md
+
+# IDE 配置(个人环境,不入库)
+.idea/
+
+# Kotlin/Gradle 构建缓存(Android 构建期生成)
+src-tauri/gen/android/.kotlin/
 
 
 # pnpm 本地缓存(误入库,见 5fa5a36 之前的提交)
