@@ -129,7 +129,11 @@ function HelpPopover() {
                   <Kbd>周五</Kbd> 本周（已过顺延）· <Kbd>下周三</Kbd> 下个自然周
                 </li>
                 <li>
-                  <Kbd>10月8日</Kbd> 或 <Kbd>10/8</Kbd>，已过自动顺延一年
+                  <Kbd>10月8日</Kbd> · <Kbd>10/8</Kbd>（无年份，已过自动顺延一年）
+                </li>
+                <li>
+                  <Kbd>2026/10/8</Kbd> · <Kbd>2026-10-8</Kbd> ·{" "}
+                  <Kbd>2026年10月8日</Kbd>（指定年份，不顺延）
                 </li>
                 <li>
                   可紧贴标题：<Kbd>明天交报告</Kbd>

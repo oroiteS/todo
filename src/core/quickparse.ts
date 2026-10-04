@@ -34,9 +34,11 @@ const DAY_CN: Record<string, number> = {
   天: 0,
 };
 
-// 从字符串开头起匹配的日期词（允许后跟中文或空白）
+// 从字符串开头起匹配的日期词（允许后跟中文或空白）。
+// 数值日期两种形态（含年份）：[年]月日 / 年月日（2026/10/8、2026-10-8、2026.10.8、2026年10月8日），
+// 以及不带年份的 月日（10/8、10-8，按当前年，已过自动顺延一年）。
 const DATE_PREFIX_RE =
-  /^(今天|今日|明天|明日|后天|大后天|(?:下?周|下?星期|下?礼拜)([一二三四五六日末天])|(\d{1,2})月(\d{1,2})[日号]|(\d{1,2})[\/\-](\d{1,2}))(?=[\s\u4e00-\u9fff]|$)/;
+  /^(今天|今日|明天|明日|后天|大后天|(?:下?周|下?星期|下?礼拜)([一二三四五六日末天])|(?:(\d{4})年)?(\d{1,2})月(\d{1,2})[日号]|(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})|(\d{1,2})[\/\-](\d{1,2}))(?=[\s\u4e00-\u9fff]|$)/;
 
 export function parseQuickAdd(
   input: string,
@@ -52,7 +54,9 @@ export function parseQuickAdd(
   for (;;) {
     const m = DATE_PREFIX_RE.exec(rest);
     if (!m) break;
-    dueDate = resolveDateMatch(m, today, now);
+    const resolved = resolveDateMatch(m, today, now);
+    if (resolved === null) break; // 不存在的日期（2月30日）：不消费，保留原词
+    dueDate = resolved;
     rest = rest.slice(m[0].length).replace(/^\s+/, "");
   }
 
@@ -89,7 +93,7 @@ function resolveDateMatch(
   m: RegExpExecArray,
   today: string,
   now: Date,
-): string {
+): string | null {
   if (m[1] === "今天" || m[1] === "今日") return today;
   if (m[1] === "明天" || m[1] === "明日") return addDays(today, 1);
   if (m[1] === "后天") return addDays(today, 2);
@@ -112,17 +116,22 @@ function resolveDateMatch(
     return addDays(today, diff);
   }
 
-  // M月D日 或 M/D
-  const month = Number(m[3] ?? m[5]);
-  const day = Number(m[4] ?? m[6]);
-  if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-    const year = parseDate(today).getFullYear();
-    const candidate = toDateStr(new Date(year, month - 1, day));
-    // 已过去则顺延一年
-    if (candidate < today) {
-      return toDateStr(new Date(year + 1, month - 1, day));
-    }
-    return candidate;
+  // [2026年]10月8日 / 2026/10/8 / 2026-10-8 / 2026.10.8 / 10/8
+  // 捕获组：3=年(年月日) 4=月 5=日；6=年(数值) 7=月 8=日；9=月 10=日(无年份)
+  const yearStr = m[3] ?? m[6];
+  const month = Number(m[4] ?? m[7] ?? m[9]);
+  const day = Number(m[5] ?? m[8] ?? m[10]);
+  if (!month || !day || month > 12 || day > 31) return null;
+
+  const curYear = parseDate(today).getFullYear();
+  const dt = new Date(yearStr ? Number(yearStr) : curYear, month - 1, day);
+  // 拒绝不存在的日期（如 2月30日 会被 Date 滚到 3 月，月日对不上）
+  if (dt.getMonth() !== month - 1 || dt.getDate() !== day) return null;
+
+  const candidate = toDateStr(dt);
+  // 未写年份且已过 → 顺延一年；显式写了年份就按所写年份，不顺延
+  if (!yearStr && candidate < today) {
+    return toDateStr(new Date(curYear + 1, month - 1, day));
   }
-  return today;
+  return candidate;
 }
