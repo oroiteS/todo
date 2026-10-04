@@ -3,7 +3,7 @@
     <string name="main_activity_title">"TodoLite"</string>
 
     <!-- 桌面小组件 -->
-    <string name="todolite_widget_description">"今日待办与高优先级任务"</string>
+    <string name="todolite_widget_description">"离今天最近的待办任务"</string>
     <string name="todolite_widget_title_prefix">"今天 · %1$d"</string>
     <string name="todolite_widget_overdue_suffix">"逾期 %1$d"</string>
     <string name="todolite_widget_high_badge">"❗ %1$d"</string>

@@ -5,7 +5,8 @@
      任务区两列（各 4 行；RemoteViews 不支持动态增删 View，行位固定）：
        - ≤4 条：单列展示（右列隐藏，左列占满整行）
        - >4 条：自动两列；>8 条时底部显示"……"省略提示
-     每行：彩色 □ 方框前缀（逾期红 / 今日灰 / 高优橙）+ 标题（超 6 字截断加……），
+     每行：彩色 □ 方框前缀（逾期红 / 今天灰 / 高优橙 / 普通灰）+ 标题（超 6 字截断加……）
+     + 未来到期的灰色日期角标（·明天 / ·M/D），内容为离今天最近的任务（快照 nearest），
      行底灰色划线（@drawable/todolite_widget_rule，划线本风格）。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@android:id/background"

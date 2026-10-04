@@ -114,3 +114,62 @@ describe("buildSnapshot", () => {
     expect(snap.generatedAt).toBe(NOW.toISOString());
   });
 });
+
+describe("buildSnapshot — nearest（离今天最近，小组件主展示源）", () => {
+  it("按到期日升序：逾期 → 今天 → 未来，无日期任务垫底", () => {
+    const snap = buildSnapshot(
+      db([
+        task({ title: "无日期高优", priority: 3 }),
+        task({ title: "后天", dueDate: "2026-01-16" }),
+        task({ title: "今天", dueDate: TODAY }),
+        task({ title: "逾期", dueDate: "2026-01-10" }),
+        task({ title: "明天", dueDate: "2026-01-15" }),
+      ]),
+      NOW,
+    );
+    expect(snap.nearest.map((t) => t.title)).toEqual([
+      "逾期",
+      "今天",
+      "明天",
+      "后天",
+      "无日期高优",
+    ]);
+  });
+
+  it("同一天内保持手动排序（sortOrder）", () => {
+    const snap = buildSnapshot(
+      db([
+        task({ title: "B", dueDate: TODAY, sortOrder: 20 }),
+        task({ title: "A", dueDate: TODAY, sortOrder: 10 }),
+      ]),
+      NOW,
+    );
+    expect(snap.nearest.map((t) => t.title)).toEqual(["A", "B"]);
+  });
+
+  it("已完成与回收站中的任务不进入 nearest", () => {
+    const snap = buildSnapshot(
+      db([
+        task({ title: "做完", dueDate: TODAY, completedAt: "2026-01-14T09:00:00.000Z" }),
+        task({ title: "删了", dueDate: TODAY, deletedAt: "2026-01-13T00:00:00.000Z" }),
+        task({ title: "留着", dueDate: "2026-01-15" }),
+      ]),
+      NOW,
+    );
+    expect(snap.nearest.map((t) => t.title)).toEqual(["留着"]);
+  });
+
+  it("超过 10 条时截断（保留 >8 条以驱动组件溢出提示）", () => {
+    const tasks = Array.from({ length: 13 }, (_, i) =>
+      task({ title: `t${i}`, dueDate: `2026-02-${String(i + 1).padStart(2, "0")}` }),
+    );
+    const snap = buildSnapshot(db(tasks), NOW);
+    expect(snap.nearest).toHaveLength(10);
+    expect(snap.nearest[0]?.title).toBe("t0");
+  });
+
+  it("空库时 nearest 为空", () => {
+    const snap = buildSnapshot(db([]), NOW);
+    expect(snap.nearest).toHaveLength(0);
+  });
+});

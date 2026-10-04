@@ -46,6 +46,11 @@ pub struct WidgetSnapshot {
     /// 高优先级（priority=3）未完成任务，与到期日无关；v1.1 新增
     #[serde(default)]
     pub high_priority: Vec<WidgetTaskRef>,
+    /// 离今天最近的未完成任务（到期日升序：逾期→今天→未来，无日期垫底），
+    /// Android 小组件的主展示源；v1.2 新增。
+    /// #[serde(default)] 保证旧快照（无该字段）仍可解码。
+    #[serde(default)]
+    pub nearest: Vec<WidgetTaskRef>,
     pub counts: WidgetCounts,
 }
 

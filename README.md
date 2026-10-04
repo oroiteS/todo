@@ -6,7 +6,7 @@
 - **本地优先**：数据存在你自己的设备上，无账号、无追踪
 - **双通道同步**：WebDAV 网盘或 GitHub 私有仓库（HTTPS + Token，无需 SSH），任务级自动合并
 - **智能输入**：`明天 交报告 #工作 !高` 一行搞定日期 / 列表 / 优先级
-- **桌面小组件**：Android（AppWidget）展示「今日待办 + 高优先级任务」，数据变更**实时刷新**；macOS 端（WidgetKit）已开发但被系统枚举阻塞暂不可用（[docs/widget-adaptation.md](docs/widget-adaptation.md) §4.5）
+- **桌面小组件**：Android（AppWidget）展示「离今天最近的 8 个任务」，数据变更**实时刷新**；macOS 端（WidgetKit）已开发但被系统枚举阻塞暂不可用（[docs/widget-adaptation.md](docs/widget-adaptation.md) §4.5）
 
 ## 开发状态（v0.4.4 · 2026-10）
 
@@ -178,7 +178,7 @@ Token 只存系统凭据管理器。每次同步在仓库中就是一个真实 c
 
 ## 小组件
 
-macOS **已开发、暂不可用**（WidgetKit，内容为**今日待办 + 高优先级任务**）：快照
+macOS **已开发、暂不可用**（WidgetKit）：快照
 通道与扩展代码完整保留，但 swiftc 手工构建的 .appex 在 macOS 27 上无法通过
 WidgetKit 画廊枚举（chronod 拉起扩展时引导崩溃；同机 ad-hoc 的 Xcode 构建第三方
 组件正常，**免费签名并非阻碍**）。完整排查记录与恢复路径见

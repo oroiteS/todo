@@ -37,6 +37,11 @@ export interface WidgetSnapshot {
   overdue: WidgetTaskRef[];
   /** 高优先级（priority=3）未完成任务，与到期日无关 */
   highPriority: WidgetTaskRef[];
+  /**
+   * 离今天最近的未完成任务，小组件主展示源（v1.2 新增）：
+   * 有到期日按日期升序（逾期 → 今天 → 未来），同日保持手动排序，无日期任务垫底。
+   */
+  nearest: WidgetTaskRef[];
   counts: {
     today: number;
     upcoming: number;
@@ -59,6 +64,25 @@ function toRef(db: Database, t: Task): WidgetTaskRef {
   };
 }
 
+/**
+ * 小组件展示列表：离今天最近的任务。
+ * activeTasks 已按 sortOrder 稳定排序，这里只做「有日期在前、按日期升序」：
+ * ISO "yyyy-MM-dd" 字符串可直接字典序比较，逾期 → 今天 → 未来自然有序，
+ * 且与渲染时的「今天」无关——跨天无需重新推送快照顺序也不出错；无日期垫底。
+ */
+function nearestTasks(db: Database): Task[] {
+  const dated: Task[] = [];
+  const undated: Task[] = [];
+  for (const t of activeTasks(db)) {
+    if (t.dueDate) dated.push(t);
+    else undated.push(t);
+  }
+  dated.sort((a, b) =>
+    a.dueDate! < b.dueDate! ? -1 : a.dueDate! > b.dueDate! ? 1 : 0,
+  );
+  return [...dated, ...undated];
+}
+
 export function buildSnapshot(db: Database, now: Date = new Date()): WidgetSnapshot {
   const today = todayStr(now);
   const dueTodayOrOverdue = todayTasks(db, today);
@@ -76,6 +100,7 @@ export function buildSnapshot(db: Database, now: Date = new Date()): WidgetSnaps
     today: todays.slice(0, SNAPSHOT_CAP).map((t) => toRef(db, t)),
     overdue: overdue.slice(0, SNAPSHOT_CAP).map((t) => toRef(db, t)),
     highPriority: highPriority.slice(0, SNAPSHOT_CAP).map((t) => toRef(db, t)),
+    nearest: nearestTasks(db).slice(0, SNAPSHOT_CAP).map((t) => toRef(db, t)),
     counts: {
       today: todays.length,
       upcoming: upcomingTasks(db, today).length,

@@ -34,6 +34,9 @@ flowchart LR
   "highPriority": [                // 高优先级（priority=3）未完成，与到期日无关，最多 10 条；v1.1 新增
     { "id": "...", "title": "救火", "listName": "工作", "dueDate": null, "priority": 3 }
   ],
+  "nearest": [                     // 离今天最近（小组件主展示源）：到期日升序（逾期→今天→未来），同日保持手动排序，无日期垫底，最多 10 条；v1.2 新增
+    { "id": "...", "title": "交周报", "listName": "工作", "dueDate": "2026-01-14", "priority": 2 }
+  ],
   "counts": {
     "today": 3,          // 今天到期总数（不受 10 条截断影响）
     "upcoming": 5,       // 未来 7 天
@@ -149,14 +152,14 @@ open src-tauri/target/release/bundle/macos/TodoLite.app
 
 ## 5. Android AppWidget 小组件（✅ v1.2 已实现）
 
-实现走**标准 AppWidget + RemoteViews**（未用 Glance）：内容为「今日待办 + 高优先级任务」，
+实现走**标准 AppWidget + RemoteViews**（未用 Glance）：内容为「离今天最近的 8 个任务」（快照 `nearest`），
 与 macOS 小组件同一快照通道。无任何签名/厂商认证要求，自签名 APK 即可用。
 
 ### 5.1 文件清单（均在 `src-tauri/gen/android/app/src/main/`）
 
 | 文件 | 作用 |
 |---|---|
-| `java/com/syn/todolite/TodoliteWidgetProvider.kt` | AppWidgetProvider：读快照 → RemoteViews 渲染；逾期（红点）→ 今日（灰点）→ 高优（橙点）去重后至多 4 行；标题「今天 · N」+ 红色「逾期 K」后缀 + 橙色「❗ M」徽标；空态文案；点击任意位置打开主应用 |
+| `java/com/syn/todolite/TodoliteWidgetProvider.kt` | AppWidgetProvider：读快照 → RemoteViews 渲染；任务行取 `nearest`（离今天最近，前端已按到期日升序排好），圆点按任务状态着色（逾期红 / 今天灰 / 高优橙 / 普通灰），未来到期追加「·明天 / ·M/D」角标，两列至多 8 行，>8 条底部"……"；旧快照（无 `nearest`）回退三桶合并；标题「今天 · N」+ 红色「逾期 K」后缀 + 橙色「❗ M」徽标；点击任意位置打开主应用 |
 | `res/xml/todolite_widget_info.xml` | provider 信息：4x2（`targetCellWidth/Height`），`updatePeriodMillis=1800000` 半小时兜底，`previewLayout` 用真布局做预览 |
 | `res/layout/todolite_widget.xml` | 布局：根布局 `@android:id/background` + 圆角背景（系统按该 ID 统一裁切圆角） |
 | `res/drawable/todolite_widget_bg.xml` | 16dp 圆角背景（兼容旧版本/圆角识别失败场景） |
