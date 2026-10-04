@@ -8,7 +8,7 @@
 - **智能输入**：`明天 交报告 #工作 !高` 一行搞定日期 / 列表 / 优先级
 - **桌面小组件**：Android（AppWidget）展示「今日待办 + 高优先级任务」，数据变更**实时刷新**；macOS 端（WidgetKit）已开发但被系统枚举阻塞暂不可用（[docs/widget-adaptation.md](docs/widget-adaptation.md) §4.5）
 
-## 开发状态（v0.3.0 · 2026-10）
+## 开发状态（v0.3.1 · 2026-10）
 
 三端可用。Android 端近期集中打磨完毕，均已实机验证：
 
@@ -16,6 +16,8 @@
 - ✅ **小组件实时刷新**——数据变更后 JNI 直调 `AppWidgetManager.updateAppWidget`（含 R8 keep 规则防裁剪，30 分钟系统轮询兜底）
 - ✅ **小组件美化**——≤4 条单列、>4 条自动两列（最多 2×4=8 条），彩色 □ 方框前缀（逾期红/今日灰/高优橙）、划线本式行线、超 6 字截断
 - ✅ **老 WebView / 模拟器兼容**——transform 全量采用经典写法（BlueStacks 等环境实测可用）
+- ✅ **设置页外观（v0.3.1）**——窄屏主题切换独占一行不再被色板挤压溢出，色板同屏 3 个、可滑动
+- ✅ **同步代理（v0.3.1）**——不走代理 / 自动检测 / 指定代理（HTTP、SOCKS5），WebDAV 与 GitHub 同步均生效
 - ❌ **macOS 小组件被阻塞**——代码与快照通道已完成，但 swiftc 手工构建的 .appex 无法通过 macOS 27 的 WidgetKit 画廊枚举（chronod 拉起即崩，根因未定位；同机 ad-hoc 的 Xcode 构建扩展正常）。接口保留，恢复路径见 [docs](docs/widget-adaptation.md) §4.5
 - 🔜 **接下来**：任务提醒通知、子任务/标签
 
