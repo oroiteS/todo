@@ -266,6 +266,50 @@ describe("normalizeProxy", () => {
   });
 });
 
+describe("同步通道开关 / 独立启停", () => {
+  it("缺省：WebDAV 开、GitHub 关", () => {
+    const db = normalizeDatabase({ settings: {} }, T0);
+    expect(db.settings.webdavEnabled).toBe(true);
+    expect(db.settings.githubEnabled).toBe(false);
+  });
+
+  it("旧单选字段迁移：webdav → 仅 WebDAV 开", () => {
+    const db = normalizeDatabase({ settings: { syncBackend: "webdav" } }, T0);
+    expect(db.settings.webdavEnabled).toBe(true);
+    expect(db.settings.githubEnabled).toBe(false);
+  });
+
+  it("旧单选字段迁移：github → 仅 GitHub 开", () => {
+    const db = normalizeDatabase({ settings: { syncBackend: "github" } }, T0);
+    expect(db.settings.webdavEnabled).toBe(false);
+    expect(db.settings.githubEnabled).toBe(true);
+  });
+
+  it("显式开关优先于旧字段", () => {
+    const db = normalizeDatabase(
+      { settings: { syncBackend: "github", webdavEnabled: true } },
+      T0,
+    );
+    expect(db.settings.webdavEnabled).toBe(true);
+    expect(db.settings.githubEnabled).toBe(true);
+  });
+
+  it("两种全关、双开都是合法状态", () => {
+    const off = normalizeDatabase(
+      { settings: { webdavEnabled: false, githubEnabled: false } },
+      T0,
+    );
+    expect(off.settings.webdavEnabled).toBe(false);
+    expect(off.settings.githubEnabled).toBe(false);
+    const both = normalizeDatabase(
+      { settings: { webdavEnabled: true, githubEnabled: true } },
+      T0,
+    );
+    expect(both.settings.webdavEnabled).toBe(true);
+    expect(both.settings.githubEnabled).toBe(true);
+  });
+});
+
 describe("ensureInbox / 收集箱固定 id", () => {
   it("新库创建固定 id 的收集箱（多设备首启 id 一致）", () => {
     const db = ensureInbox(emptyDatabase(T0), T0);

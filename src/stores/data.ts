@@ -13,7 +13,6 @@ import type {
   Settings,
   Task,
   TaskList,
-  SyncBackendKind,
   WebDAVConfig,
 } from "@/core/models";
 import * as ops from "@/core/operations";
@@ -58,7 +57,6 @@ interface DataStore {
   updateSettings(patch: Partial<Settings>): void;
   setWebDAV(cfg: WebDAVConfig | null): void;
   setGitHub(cfg: GitHubSyncConfig | null): void;
-  setSyncBackend(kind: SyncBackendKind): void;
   /** 同步结果回写：与当前活数据再合并，绝不触发新一轮自动同步 */
   replaceDatabase(incoming: Database): void;
   importDatabase(raw: unknown): boolean;
@@ -91,8 +89,10 @@ export const useDataStore = create<DataStore>((set, get) => {
   };
   const scheduleAutoSync = () => {
     const s = get().db.settings;
-    const active = s.syncBackend === "github" ? s.github : s.webdav;
-    if (!active?.autoSync) return;
+    // 任一已启用通道开了自动同步，就触发一次全量同步（已启用通道依次执行）
+    const anyAuto =
+      (s.webdavEnabled && s.webdav?.autoSync) || (s.githubEnabled && s.github?.autoSync);
+    if (!anyAuto) return;
     syncTimer = schedule(syncTimer, 2500, () => void get().triggerSync());
   };
 
@@ -223,13 +223,6 @@ export const useDataStore = create<DataStore>((set, get) => {
       if (!cfg) void deleteSecret("github");
     },
 
-    setSyncBackend(kind) {
-      mutate((db) => ({
-        ...db,
-        settings: { ...db.settings, syncBackend: kind },
-      }));
-    },
-
     replaceDatabase(incoming) {
       // 防竞态：同步期间的本地新编辑 updatedAt 更新，合并后胜出
       const { merged } = mergeDatabases(get().db, incoming);
@@ -261,30 +254,71 @@ export const useDataStore = create<DataStore>((set, get) => {
     async triggerSync() {
       const s = get().db.settings;
       const applyMerged = (db: Database) => get().replaceDatabase(db);
-      if (s.syncBackend === "github") {
-        const cfg = s.github;
-        if (!cfg?.repo) {
-          useSyncStore.getState().update({ status: "error", message: "未配置 GitHub 仓库" });
-          return;
-        }
-        const token = (await getSecret("github")) ?? "";
-        await syncNow({
-          backend: githubBackend(cfg, token),
-          local: get().db,
-          applyMerged,
-        });
-      } else {
+
+      // 收集已启用通道（按声明顺序依次执行）
+      const channels: Array<{ name: string; run(): Promise<void> }> = [];
+      if (s.webdavEnabled) {
         const cfg = s.webdav;
-        if (!cfg?.url) {
-          useSyncStore.getState().update({ status: "error", message: "未配置 WebDAV" });
-          return;
-        }
-        const password = (await getSecret("webdav")) ?? "";
-        await syncNow({
-          backend: webdavBackend({ ...cfg, password }),
-          local: get().db,
-          applyMerged,
+        channels.push({
+          name: "WebDAV",
+          run: async () => {
+            if (!cfg?.url) throw new Error("已启用但未配置服务器地址");
+            const password = (await getSecret("webdav")) ?? "";
+            await syncNow({
+              backend: webdavBackend({ ...cfg, password }),
+              local: get().db,
+              applyMerged,
+            });
+          },
         });
+      }
+      if (s.githubEnabled) {
+        const cfg = s.github;
+        channels.push({
+          name: "GitHub",
+          run: async () => {
+            if (!cfg?.repo) throw new Error("已启用但未配置仓库");
+            const token = (await getSecret("github")) ?? "";
+            await syncNow({
+              backend: githubBackend(cfg, token),
+              local: get().db,
+              applyMerged,
+            });
+          },
+        });
+      }
+
+      if (!channels.length) {
+        useSyncStore
+          .getState()
+          .update({ status: "error", message: "未启用任何同步通道（设置 → 同步）" });
+        return;
+      }
+
+      // 依次执行，聚合结果：任一失败都进错误信息，并注明成功通道数
+      const failures: string[] = [];
+      for (const ch of channels) {
+        useSyncStore.getState().update({ status: "syncing", message: `正在同步 ${ch.name}…` });
+        try {
+          await ch.run();
+        } catch (e) {
+          failures.push(`${ch.name}：${e instanceof Error ? e.message : String(e)}`);
+          continue;
+        }
+        const st = useSyncStore.getState();
+        if (st.status === "error") {
+          failures.push(`${ch.name}：${st.message ?? "失败"}`);
+        }
+      }
+
+      if (failures.length) {
+        const okCount = channels.length - failures.length;
+        const suffix = okCount > 0 ? `（${okCount} 个通道成功）` : "";
+        useSyncStore
+          .getState()
+          .update({ status: "error", message: `${failures.join("；")}${suffix}` });
+      } else {
+        useSyncStore.getState().update({ status: "ok", message: null });
       }
     },
   };

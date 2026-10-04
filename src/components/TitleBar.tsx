@@ -19,9 +19,8 @@ export function TitleBar() {
   const theme = useDataStore((s) => s.db.settings.theme);
   const updateSettings = useDataStore((s) => s.updateSettings);
   const syncConfigured = useDataStore((s) =>
-    s.db.settings.syncBackend === "github"
-      ? !!s.db.settings.github
-      : !!s.db.settings.webdav,
+    (s.db.settings.webdavEnabled && !!s.db.settings.webdav) ||
+    (s.db.settings.githubEnabled && !!s.db.settings.github),
   );
   const triggerSync = useDataStore((s) => s.triggerSync);
 

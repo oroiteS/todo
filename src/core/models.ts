@@ -95,8 +95,12 @@ export interface Settings {
   accent: AccentName;
   /** 网络代理（作用于同步请求） */
   proxy: ProxyConfig;
-  /** 当前使用的同步后端 */
+  /** 旧版单选后端字段：仅为兼容旧版本客户端保留，新逻辑用下面的独立开关 */
   syncBackend: SyncBackendKind;
+  /** WebDAV 通道开关（可与其他通道同时开启） */
+  webdavEnabled: boolean;
+  /** GitHub 通道开关 */
+  githubEnabled: boolean;
   /** WebDAV 配置（密码不在此处，存系统凭据管理器） */
   webdav: WebDAVConfig | null;
   /** GitHub 配置（Token 存系统凭据管理器） */

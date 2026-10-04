@@ -188,10 +188,10 @@ function Switch({ checked, onChange }: { checked: boolean; onChange(v: boolean):
 
 function StatusLine({
   localMsg,
-  lastSyncAt,
+  lastSyncAt = null,
 }: {
   localMsg: { ok: boolean; text: string } | null;
-  lastSyncAt: string | null;
+  lastSyncAt?: string | null;
 }) {
   const { status, message } = useSyncStore();
   return (
@@ -213,52 +213,94 @@ function StatusLine({
 }
 
 function SyncSection() {
-  const syncBackend = useDataStore((s) => s.db.settings.syncBackend);
-  const setSyncBackend = useDataStore((s) => s.setSyncBackend);
+  const webdavEnabled = useDataStore((s) => s.db.settings.webdavEnabled);
+  const githubEnabled = useDataStore((s) => s.db.settings.githubEnabled);
+  const updateSettings = useDataStore((s) => s.updateSettings);
+  const triggerSync = useDataStore((s) => s.triggerSync);
+  const { status, lastSyncAt } = useSyncStore();
 
   return (
     <Card icon={<Cloud size={14} />} title="同步">
-      <div className="mb-4 flex rounded-xl bg-panel2 p-1">
-        {(
-          [
-            { value: "webdav", label: "WebDAV 网盘" },
-            { value: "github", label: "GitHub 仓库" },
-          ] as const
-        ).map((b) => (
-          <button
-            key={b.value}
-            type="button"
-            onClick={() => setSyncBackend(b.value)}
-            className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-[13px] transition-all",
-              syncBackend === b.value
-                ? "bg-panel font-medium shadow-sm"
-                : "text-ink2 hover:text-ink",
-            )}
-          >
-            {b.value === "github" && <Github size={13} />}
-            {b.label}
-          </button>
-        ))}
+      <p className="mb-3 text-[11px] leading-relaxed text-ink3">
+        通道可独立开关、也可同时开启，同步时依次执行；「变更后自动同步」在各通道内单独设置。
+      </p>
+
+      <ChannelHeader
+        icon={<CloudUpload size={13} />}
+        title="WebDAV 网盘"
+        enabled={webdavEnabled}
+        onChange={(v) => updateSettings({ webdavEnabled: v })}
+      />
+      {webdavEnabled ? <WebDAVForm /> : <DisabledHint />}
+
+      <div className="my-4 border-t border-line/60" />
+
+      <ChannelHeader
+        icon={<Github size={13} />}
+        title="GitHub 仓库"
+        enabled={githubEnabled}
+        onChange={(v) => updateSettings({ githubEnabled: v })}
+      />
+      {githubEnabled ? <GitHubForm /> : <DisabledHint />}
+
+      <div className="mt-4 border-t border-line/60 pt-3">
+        <button
+          type="button"
+          className={btnPrimaryCls}
+          onClick={() => void triggerSync()}
+          disabled={status === "syncing"}
+        >
+          {status === "syncing" ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : (
+            <RefreshCw size={13} />
+          )}
+          立即同步
+        </button>
+        <StatusLine localMsg={null} lastSyncAt={lastSyncAt} />
       </div>
-      {syncBackend === "github" ? <GitHubForm /> : <WebDAVForm />}
     </Card>
+  );
+}
+
+/** 通道小节头：名称 + 启用开关 */
+function ChannelHeader({
+  icon,
+  title,
+  enabled,
+  onChange,
+}: {
+  icon: ReactNode;
+  title: string;
+  enabled: boolean;
+  onChange(v: boolean): void;
+}) {
+  return (
+    <div className="mb-3 flex items-center justify-between">
+      <span className="flex items-center gap-1.5 text-[13px] font-semibold">{icon}{title}</span>
+      <Switch checked={enabled} onChange={onChange} />
+    </div>
+  );
+}
+
+function DisabledHint() {
+  return (
+    <p className="rounded-lg bg-panel2/40 px-2.5 py-2 text-xs text-ink3">
+      已关闭，开启后可配置并参与同步
+    </p>
   );
 }
 
 function WebDAVForm() {
   const webdav = useDataStore((s) => s.db.settings.webdav);
-  const lastSyncAt = useDataStore((s) => s.db.settings.lastSyncAt);
   const setWebDAV = useDataStore((s) => s.setWebDAV);
-  const triggerSync = useDataStore((s) => s.triggerSync);
-  const { status } = useSyncStore();
 
   const [url, setUrl] = useState(webdav?.url ?? "");
   const [username, setUsername] = useState(webdav?.username ?? "");
   const [password, setPassword] = useState("");
   const [directory, setDirectory] = useState(webdav?.directory ?? "TodoLite");
   const [autoSync, setAutoSync] = useState(webdav?.autoSync ?? true);
-  const [busy, setBusy] = useState<"test" | "save" | "sync" | null>(null);
+  const [busy, setBusy] = useState<"test" | "save" | null>(null);
   const [localMsg, setLocalMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const currentCfg = () => ({
@@ -293,13 +335,6 @@ function WebDAVForm() {
     } catch (e) {
       setLocalMsg({ ok: false, text: `保存失败：${String(e)}` });
     }
-    setBusy(null);
-  };
-
-  const onSync = async () => {
-    setBusy("sync");
-    await onSave();
-    await triggerSync();
     setBusy(null);
   };
 
@@ -360,17 +395,9 @@ function WebDAVForm() {
           {busy === "save" ? <Loader2 size={13} className="animate-spin" /> : null}
           保存配置
         </button>
-        <button type="button" className={btnCls} onClick={onSync} disabled={busy !== null}>
-          {busy === "sync" || status === "syncing" ? (
-            <Loader2 size={13} className="animate-spin" />
-          ) : (
-            <RefreshCw size={13} />
-          )}
-          立即同步
-        </button>
       </div>
 
-      <StatusLine localMsg={localMsg} lastSyncAt={lastSyncAt} />
+      <StatusLine localMsg={localMsg} />
       <p className="mt-1.5 text-[11px] leading-relaxed text-ink3">
         坚果云等服务的 WebDAV 需使用「应用密码」而非登录密码；密码只存本机系统凭据管理器。
       </p>
@@ -380,17 +407,14 @@ function WebDAVForm() {
 
 function GitHubForm() {
   const gh = useDataStore((s) => s.db.settings.github);
-  const lastSyncAt = useDataStore((s) => s.db.settings.lastSyncAt);
   const setGitHub = useDataStore((s) => s.setGitHub);
-  const triggerSync = useDataStore((s) => s.triggerSync);
-  const { status } = useSyncStore();
 
   const [repo, setRepo] = useState(gh?.repo ?? "");
   const [branch, setBranch] = useState(gh?.branch ?? "main");
   const [path, setPath] = useState(gh?.path ?? "todolite-data.json");
   const [token, setToken] = useState("");
   const [autoSync, setAutoSync] = useState(gh?.autoSync ?? true);
-  const [busy, setBusy] = useState<"test" | "save" | "sync" | null>(null);
+  const [busy, setBusy] = useState<"test" | "save" | null>(null);
   const [localMsg, setLocalMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const currentCfg = () => ({
@@ -422,13 +446,6 @@ function GitHubForm() {
     } catch (e) {
       setLocalMsg({ ok: false, text: `保存失败：${String(e)}` });
     }
-    setBusy(null);
-  };
-
-  const onSync = async () => {
-    setBusy("sync");
-    await onSave();
-    await triggerSync();
     setBusy(null);
   };
 
@@ -494,17 +511,9 @@ function GitHubForm() {
           {busy === "save" ? <Loader2 size={13} className="animate-spin" /> : null}
           保存配置
         </button>
-        <button type="button" className={btnCls} onClick={onSync} disabled={busy !== null}>
-          {busy === "sync" || status === "syncing" ? (
-            <Loader2 size={13} className="animate-spin" />
-          ) : (
-            <RefreshCw size={13} />
-          )}
-          立即同步
-        </button>
       </div>
 
-      <StatusLine localMsg={localMsg} lastSyncAt={lastSyncAt} />
+      <StatusLine localMsg={localMsg} />
       <p className="mt-1.5 text-[11px] leading-relaxed text-ink3">
         建议使用私有仓库。Token 在 github.com/settings/personal-access-tokens/new 创建
         （fine-grained）：只勾选这一个仓库 +「Contents: Read and write」权限即可。

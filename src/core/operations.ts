@@ -19,6 +19,8 @@ export function emptyDatabase(now: Date = new Date()): Database {
       accent: "rose",
       proxy: { ...DEFAULT_PROXY },
       syncBackend: "webdav",
+      webdavEnabled: true,
+      githubEnabled: false,
       webdav: null,
       github: null,
       lastSyncAt: null,
@@ -74,6 +76,10 @@ export function normalizeDatabase(raw: unknown, now: Date = new Date()): Databas
       accent: obj.settings.accent ?? "rose",
       proxy: normalizeProxy(obj.settings.proxy),
       syncBackend: obj.settings.syncBackend ?? "webdav",
+      // 独立通道开关：旧数据由单选 syncBackend 迁移；显式开关优先
+      webdavEnabled:
+        obj.settings.webdavEnabled ?? (obj.settings.syncBackend ?? "webdav") === "webdav",
+      githubEnabled: obj.settings.githubEnabled ?? obj.settings.syncBackend === "github",
       webdav: obj.settings.webdav ?? null,
       github: obj.settings.github ?? null,
       lastSyncAt: obj.settings.lastSyncAt ?? null,
