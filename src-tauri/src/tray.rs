@@ -7,11 +7,16 @@
 //!
 //! 仅桌面端编译（cfg(desktop)），移动端不受影响。
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager,
 };
+
+/// 托盘是否成功创建。Linux 极简桌面可能缺 libayatana-appindicator / DBus：
+/// 此时应用不得驻留后台（关窗即退出），由 lib.rs 的 on_window_event 检查此标记。
+pub static TRAY_AVAILABLE: AtomicBool = AtomicBool::new(false);
 
 /// 与 commands::DATA_FILE 一致（那边是私有常量，这里独立声明）
 const DATA_FILE: &str = "todolite-data.json";
@@ -105,5 +110,6 @@ pub fn init(app: &AppHandle) -> tauri::Result<()> {
         builder = builder.icon(icon);
     }
     builder.build(app)?;
+    TRAY_AVAILABLE.store(true, Ordering::Relaxed);
     Ok(())
 }

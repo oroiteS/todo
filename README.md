@@ -19,6 +19,7 @@
 - ✅ **设置页外观（v0.3.1）**——窄屏主题切换独占一行不再被色板挤压溢出，色板同屏 3 个、可滑动
 - ✅ **同步代理（v0.3.1）**——不走代理 / 自动检测 / 指定代理（HTTP、SOCKS5），WebDAV 与 GitHub 同步均生效
 - ✅ **坚果云 409 兼容（v0.3.2）**——HTTP 请求补 User-Agent（无 UA 会被部分云服务风控拦截）；GET 409 视为父目录缺失自动补建重试；错误信息携带服务端响应原文
+- ✅ **Linux 构建**——AppImage / deb / rpm 三产物（ubuntu-22.04 打包保证兼容性），托盘缺失自动降级为普通窗口
 - ❌ **macOS 小组件被阻塞**——代码与快照通道已完成，但 swiftc 手工构建的 .appex 无法通过 macOS 27 的 WidgetKit 画廊枚举（chronod 拉起即崩，根因未定位；同机 ad-hoc 的 Xcode 构建扩展正常）。接口保留，恢复路径见 [docs](docs/widget-adaptation.md) §4.5
 - 🔜 **接下来**：任务提醒通知、子任务/标签
 
@@ -68,6 +69,18 @@ cask 由 tap 仓库的定时 workflow 跟随最新 Release 自动更新 `version
 ```bash
 brew update && brew upgrade
 ```
+
+### Linux（AppImage / deb / rpm）
+
+从 [Releases](https://github.com/oroiteS/todo/releases) 下载对应产物：
+
+- **AppImage**：单文件免安装，`chmod +x` 后直接运行，跨主流发行版（基于 glibc，老于 Ubuntu 20.04 的环境不保证）
+- **.deb**：Debian/Ubuntu 系 `sudo apt install ./todolite_*_amd64.deb`
+- **.rpm**：Fedora/openSUSE 系
+
+依赖说明：界面基于 WebKitGTK（依赖随包携带）；系统托盘用 libayatana-appindicator，
+极简桌面缺库时自动降级为普通窗口应用（关闭窗口即退出）；凭据存桌面密钥环
+（gnome-keyring / KWallet），无密钥环的环境同步密码无法保存。
 
 ## 本地开发（macOS / Windows）
 
