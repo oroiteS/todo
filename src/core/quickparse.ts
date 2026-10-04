@@ -4,6 +4,7 @@
 //   "3月8日 给妈妈打电话 !!"     -> 日期 + 中优先级
 //   "下周三 复盘"                -> 下周三
 // 日期词支持紧跟中文（"明天交报告"）也可空格分隔；#列表 需匹配已有列表。
+// 优先级/列表记号兼容全角：「！高」「！！」「＃工作」与半角等价（中文输入法免切换）。
 
 import type { Priority } from "./models";
 import {
@@ -55,19 +56,20 @@ export function parseQuickAdd(
     rest = rest.slice(m[0].length).replace(/^\s+/, "");
   }
 
-  // 2) 拆 token：优先级 与 #列表
+  // 2) 拆 token：优先级 与 #列表（记号兼容全角：！ ＃，中文输入法免切换）
   const kept: string[] = [];
   for (const token of rest.split(/\s+/)) {
     if (!token) continue;
-    if (!priority && /^!{1,3}$/.test(token)) {
+    if (!priority && /^[!！]{1,3}$/.test(token)) {
       priority = token.length === 3 ? 3 : token.length === 2 ? 2 : 1;
       continue;
     }
-    if (!priority && /^![低中高]$/.test(token)) {
-      priority = token === "!高" ? 3 : token === "!中" ? 2 : 1;
+    if (!priority && /^[!！][低中高]$/.test(token)) {
+      const level = token[1];
+      priority = level === "高" ? 3 : level === "中" ? 2 : 1;
       continue;
     }
-    if (!listQuery && token.startsWith("#") && token.length > 1) {
+    if (!listQuery && /^[#＃]/.test(token) && token.length > 1) {
       listQuery = token.slice(1);
       continue;
     }

@@ -59,6 +59,23 @@ describe("parseQuickAdd", () => {
     expect(r).toEqual({ title: "随便写点什么", dueDate: undefined, priority: undefined, listQuery: undefined });
   });
 
+  it("优先级与列表记号兼容全角 ！ ＃（中文输入法免切换）", () => {
+    expect(parseQuickAdd("任务 ！高", NOW).priority).toBe(3);
+    expect(parseQuickAdd("任务 ！中", NOW).priority).toBe(2);
+    expect(parseQuickAdd("任务 ！低", NOW).priority).toBe(1);
+    expect(parseQuickAdd("！！！ 紧急事项", NOW).priority).toBe(3);
+    expect(parseQuickAdd("任务 ！！", NOW).priority).toBe(2);
+    expect(parseQuickAdd("买菜 ＃购物清单", NOW).listQuery).toBe("购物清单");
+    // 中英混用也行
+    const r = parseQuickAdd("明天 交报告 #工作 ！高", NOW);
+    expect(r).toMatchObject({
+      title: "交报告",
+      dueDate: "2026-01-15",
+      priority: 3,
+      listQuery: "工作",
+    });
+  });
+
   it("#列表名 需要 token 形式", () => {
     expect(parseQuickAdd("买东西 #购物清单", NOW).listQuery).toBe("购物清单");
     // 标题中间的 # 不会被误判
