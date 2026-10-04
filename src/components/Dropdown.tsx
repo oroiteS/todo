@@ -33,31 +33,16 @@ interface DropdownProps {
   children: (close: () => void) => ReactNode;
   align?: "left" | "right";
   panelClass?: string;
-  /** 受控打开状态（如右键行打开菜单）；不传则内部自管 */
-  open?: boolean;
-  onOpenChange?(open: boolean): void;
 }
 
 /** 轻量下拉弹出层 */
-export function Dropdown({
-  trigger,
-  children,
-  align = "right",
-  panelClass,
-  open: openProp,
-  onOpenChange,
-}: DropdownProps) {
-  const [openState, setOpenState] = useState(false);
-  const open = openProp ?? openState;
-  const setOpen = useCallback(
-    (o: boolean) => (onOpenChange ? onOpenChange(o) : setOpenState(o)),
-    [onOpenChange],
-  );
-  const close = useCallback(() => setOpen(false), [setOpen]);
+export function Dropdown({ trigger, children, align = "right", panelClass }: DropdownProps) {
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
   const ref = useClickOutside(close);
   return (
     <div className="relative" ref={ref}>
-      {trigger({ open, toggle: () => setOpen(!open) })}
+      {trigger({ open, toggle: () => setOpen((o) => !o) })}
       {open && (
         <div
           className={cn(

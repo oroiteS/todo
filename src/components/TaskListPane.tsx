@@ -1,5 +1,5 @@
 import { Fragment, useRef, useState } from "react";
-import { ChevronDown, Trash2, Undo2, X } from "lucide-react";
+import { ChevronDown, Trash2 } from "lucide-react";
 import type { Task } from "@/core/models";
 import {
   listById,
@@ -13,7 +13,6 @@ import { todayStr } from "@/core/dates";
 import { useDataStore } from "@/stores/data";
 import { useUiStore } from "@/stores/ui";
 import { cn } from "@/lib/cn";
-import { ContextMenu } from "./ContextMenu";
 import { QuickAdd } from "./QuickAdd";
 import { TaskRow } from "./TaskRow";
 import { EmptyState } from "./EmptyState";
@@ -39,8 +38,6 @@ export function TaskListPane() {
   const dragState = useRef<{ id: string; startIndex: number; target: number } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
-  // 右键 / 长按上下文菜单（记录触发的任务与光标位置）
-  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; task: Task } | null>(null);
 
   const today = todayStr();
   const searching = searchQuery.trim().length > 0;
@@ -202,7 +199,6 @@ export function TaskListPane() {
     selected: selectedTaskId === t.id && mode === "normal",
     onSelect: () =>
       selectTask(selectedTaskId === t.id ? null : t.id),
-    onContextMenu: (x: number, y: number) => setCtxMenu({ x, y, task: t }),
   });
 
   const total = active.length + done.length;
@@ -294,38 +290,6 @@ export function TaskListPane() {
           </div>
         )}
       </div>
-
-      {ctxMenu && (
-        <ContextMenu
-          x={ctxMenu.x}
-          y={ctxMenu.y}
-          onClose={() => setCtxMenu(null)}
-          items={
-            ctxMenu.task.deletedAt
-              ? [
-                  {
-                    label: "恢复",
-                    icon: <Undo2 size={13} />,
-                    onClick: () => restoreTask(ctxMenu.task.id),
-                  },
-                  {
-                    label: "彻底删除",
-                    danger: true,
-                    icon: <X size={13} />,
-                    onClick: () => purgeTask(ctxMenu.task.id),
-                  },
-                ]
-              : [
-                  {
-                    label: "移入回收站",
-                    danger: true,
-                    icon: <Trash2 size={13} />,
-                    onClick: () => deleteTask(ctxMenu.task.id),
-                  },
-                ]
-          }
-        />
-      )}
     </main>
   );
 }

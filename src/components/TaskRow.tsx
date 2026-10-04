@@ -16,8 +16,6 @@ interface Props {
   trashMode?: boolean;
   onRestore?(): void;
   onPurge?(): void;
-  /** 右键 / 移动端长按（坐标为光标位置） */
-  onContextMenu?(x: number, y: number): void;
   /** 拖拽 */
   dragHandleProps?: {
     onPointerDown(e: React.PointerEvent): void;
@@ -32,11 +30,6 @@ export function TaskRow(p: Props) {
     <div
       data-task-row
       onClick={p.onSelect}
-      onContextMenu={(e) => {
-        if (!p.onContextMenu) return;
-        e.preventDefault();
-        p.onContextMenu(e.clientX, e.clientY);
-      }}
       className={cn(
         "group relative flex cursor-default items-start gap-3 rounded-xl px-3 py-2.5 transition-colors",
         p.selected ? "bg-accent-soft" : "hover:bg-panel2",
