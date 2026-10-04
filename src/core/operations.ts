@@ -1,7 +1,7 @@
 // 领域操作：全部为 (db, ...) -> 新 db 的纯函数（不可变更新）。
 
 import type { Database, ID, Priority, ProxyConfig, Task, TaskList } from "./models";
-import { DEFAULT_INBOX_NAME, DEFAULT_PROXY } from "./models";
+import { DEFAULT_INBOX_ID, DEFAULT_INBOX_NAME, DEFAULT_PROXY } from "./models";
 import { newId } from "./ids";
 import { todayStr, isToday, isOverdue, diffDays } from "./dates";
 
@@ -79,7 +79,7 @@ export function normalizeDatabase(raw: unknown, now: Date = new Date()): Databas
       lastSyncAt: obj.settings.lastSyncAt ?? null,
     };
   }
-  return db;
+  return dedupeInboxes(db, now);
 }
 
 /** 兼容旧数据：proxy 字段缺失或不合法时回退默认（自动检测） */
@@ -91,13 +91,62 @@ export function normalizeProxy(raw: unknown): ProxyConfig {
   };
 }
 
-/** 首次启动：确保存在收集箱 */
+/** 首次启动：确保存在收集箱。
+ *  新库用固定 id（多台新设备首次同步天然并成同一个收集箱）；
+ *  固定 id 已被墓碑占用时退回随机 id，避免同 id 冲突。 */
 export function ensureInbox(db: Database, now: Date = new Date()): Database {
   if (db.lists.some((l) => l.name === DEFAULT_INBOX_NAME && !l.deletedAt)) {
     return db;
   }
+  if (!db.lists.some((l) => l.id === DEFAULT_INBOX_ID)) {
+    const maxSort = db.lists.length
+      ? Math.max(...db.lists.map((l) => l.sortOrder))
+      : 0;
+    const inbox: TaskList = {
+      id: DEFAULT_INBOX_ID,
+      name: DEFAULT_INBOX_NAME,
+      color: "#0d9488",
+      emoji: "📋",
+      sortOrder: maxSort + 1,
+      createdAt: nowIso(now),
+      updatedAt: nowIso(now),
+      deletedAt: null,
+    };
+    return { ...db, lists: [...db.lists, inbox] };
+  }
   const { db: next } = createList(db, DEFAULT_INBOX_NAME, undefined, undefined, now);
   return next;
+}
+
+/** 去重「收集箱」：多设备各自首启会创建不同 id 的同名默认列表，按 id 并集合并
+ *  后就会出现多个收集箱。保留最早创建的一个（并列取 id 字典序，保证各设备
+ *  结论一致），任务全部并入，其余列表以墓碑标记（随同步传播删除）。
+ *  在 normalizeDatabase（本地加载/导入）与 mergeDatabases（同步合并）后都会执行。 */
+export function dedupeInboxes(db: Database, now: Date = new Date()): Database {
+  const live = db.lists
+    .filter((l) => !l.deletedAt && l.name === DEFAULT_INBOX_NAME)
+    .sort((a, b) =>
+      a.createdAt !== b.createdAt
+        ? a.createdAt < b.createdAt
+          ? -1
+          : 1
+        : a.id < b.id
+          ? -1
+          : 1,
+    );
+  if (live.length < 2) return db;
+  const canonical = live[0];
+  const dupIds = new Set(live.slice(1).map((l) => l.id));
+  const ts = nowIso(now);
+  return {
+    ...db,
+    tasks: db.tasks.map((t) =>
+      dupIds.has(t.listId) ? { ...t, listId: canonical.id, updatedAt: ts } : t,
+    ),
+    lists: db.lists.map((l) =>
+      dupIds.has(l.id) ? { ...l, deletedAt: l.deletedAt ?? ts, updatedAt: ts } : l,
+    ),
+  };
 }
 
 // ---------- 任务 ----------

@@ -96,3 +96,50 @@ describe("mergeDatabases", () => {
     expect(JSON.stringify(twice)).toBe(JSON.stringify(once));
   });
 });
+
+// ---------- 收集箱去重（多设备各首启一个的同名默认列表） ----------
+
+function inboxList(id: string, createdAt: string): TaskList {
+  return { ...list(id, createdAt, "收集箱"), createdAt };
+}
+
+describe("mergeDatabases / 收集箱去重", () => {
+  const inboxA = inboxList("inbox-a", T1); // 最早创建 → 保留
+  const inboxB = inboxList("inbox-b", T2);
+  const inboxC = inboxList("inbox-c", T3);
+  const taskOf = (id: string, listId: string) => task(id, T1, { listId });
+
+  const a = db([taskOf("t1", "inbox-a")], [inboxA]);
+  const b = db([taskOf("t2", "inbox-b")], [inboxB]);
+  const c = db([taskOf("t3", "inbox-c")], [inboxC]);
+  const NOW = new Date("2026-01-14T12:00:00.000Z");
+
+  it("三设备合并后只保留一个收集箱，任务并入最早的", () => {
+    const { merged } = mergeDatabases(mergeDatabases(a, b, NOW).merged, c, NOW);
+    const live = merged.lists.filter((l) => !l.deletedAt && l.name === "收集箱");
+    expect(live).toHaveLength(1);
+    expect(live[0].id).toBe("inbox-a");
+    const dups = merged.lists.filter((l) => l.id !== "inbox-a");
+    expect(dups).toHaveLength(2);
+    expect(dups.every((l) => l.deletedAt !== null)).toBe(true);
+    expect(merged.tasks.map((t) => t.listId)).toEqual(["inbox-a", "inbox-a", "inbox-a"]);
+    expect(merged.tasks.map((t) => t.title)).toEqual(["task-t1", "task-t2", "task-t3"]);
+  });
+
+  it("合并满足交换律：merge(a,b) 与 merge(b,a) 结果一致（数组顺序无关）", () => {
+    const byId = <T extends { id: string }>(xs: T[]) =>
+      JSON.stringify([...xs].sort((x, y) => (x.id < y.id ? -1 : 1)));
+    const ab = mergeDatabases(a, b, NOW).merged;
+    const ba = mergeDatabases(b, a, NOW).merged;
+    expect(byId(ab.lists)).toBe(byId(ba.lists));
+    expect(byId(ab.tasks)).toBe(byId(ba.tasks));
+  });
+
+  it("同名但已改名的列表不受影响；单个收集箱不触发去重", () => {
+    const renamed = { ...list("work", T2), name: "工作" };
+    const single = db([], [inboxA, renamed]);
+    const { merged } = mergeDatabases(single, db([], []), NOW);
+    expect(merged.lists.filter((l) => !l.deletedAt)).toHaveLength(2);
+    expect(merged.lists.find((l) => l.id === "inbox-a")?.deletedAt).toBeNull();
+  });
+});

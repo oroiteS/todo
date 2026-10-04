@@ -141,3 +141,6 @@ export const LIST_EMOJIS = [
 ];
 
 export const DEFAULT_INBOX_NAME = "收集箱";
+
+/** 默认收集箱的固定 id：新设备首启创建相同 id，首次同步天然并成同一个收集箱 */
+export const DEFAULT_INBOX_ID = "inbox";

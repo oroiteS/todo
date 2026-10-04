@@ -265,3 +265,69 @@ describe("normalizeProxy", () => {
     });
   });
 });
+
+describe("ensureInbox / 收集箱固定 id", () => {
+  it("新库创建固定 id 的收集箱（多设备首启 id 一致）", () => {
+    const db = ensureInbox(emptyDatabase(T0), T0);
+    expect(db.lists).toHaveLength(1);
+    expect(db.lists[0].id).toBe("inbox");
+    expect(db.lists[0].name).toBe("收集箱");
+  });
+
+  it("已有存活收集箱时不重复创建", () => {
+    const seeded = ensureInbox(emptyDatabase(T0), T0);
+    expect(ensureInbox(seeded, T0).lists).toHaveLength(1);
+  });
+
+  it("固定 id 被墓碑占用时改用随机 id，避免同 id 冲突", () => {
+    const tombstone = {
+      ...ensureInbox(emptyDatabase(T0), T0).lists[0],
+      deletedAt: "2026-01-14T09:00:00.000Z",
+      updatedAt: "2026-01-14T09:00:00.000Z",
+    };
+    const db = ensureInbox({ ...emptyDatabase(T0), lists: [tombstone] }, T0);
+    const live = db.lists.filter((l) => !l.deletedAt);
+    expect(live).toHaveLength(1);
+    expect(live[0].id).not.toBe("inbox");
+    expect(live[0].name).toBe("收集箱");
+  });
+});
+
+describe("normalizeDatabase / 收集箱去重", () => {
+  it("多个同名收集箱只保留最早创建的，任务并入", () => {
+    const db = normalizeDatabase(
+      {
+        lists: [
+          { id: "a", name: "收集箱", createdAt: "2026-01-01T00:00:00.000Z" },
+          { id: "b", name: "收集箱", createdAt: "2026-01-02T00:00:00.000Z" },
+          { id: "c", name: "工作", createdAt: "2026-01-03T00:00:00.000Z" },
+        ],
+        tasks: [
+          { id: "t1", listId: "b", title: "来自重复收集箱" },
+          { id: "t2", listId: "c", title: "来自工作" },
+        ],
+      },
+      T0,
+    );
+    expect(db.lists.filter((l) => !l.deletedAt && l.name === "收集箱")).toHaveLength(1);
+    expect(db.lists.find((l) => l.id === "a")?.deletedAt).toBeNull();
+    expect(db.lists.find((l) => l.id === "b")?.deletedAt).not.toBeNull();
+    expect(db.lists.find((l) => l.id === "c")?.deletedAt).toBeNull();
+    expect(db.tasks.find((t) => t.id === "t1")?.listId).toBe("a");
+    expect(db.tasks.find((t) => t.id === "t2")?.listId).toBe("c");
+  });
+
+  it("已改名的旧收集箱不受去重影响", () => {
+    const db = normalizeDatabase(
+      {
+        lists: [
+          { id: "a", name: "收集箱", createdAt: "2026-01-01T00:00:00.000Z" },
+          { id: "b", name: "收件盒", createdAt: "2026-01-02T00:00:00.000Z" },
+        ],
+        tasks: [],
+      },
+      T0,
+    );
+    expect(db.lists.filter((l) => !l.deletedAt)).toHaveLength(2);
+  });
+});

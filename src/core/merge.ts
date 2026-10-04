@@ -3,6 +3,7 @@
 // 纯函数、可交换验证的关键性质：merge(a, b) 逐任务确定、幂等。
 
 import type { Database, Task, TaskList } from "./models";
+import { dedupeInboxes } from "./operations";
 
 function newer<T extends { updatedAt: string }>(a: T, b: T): T {
   return a.updatedAt >= b.updatedAt ? a : b;
@@ -24,6 +25,7 @@ function mergeById<T extends { id: string; updatedAt: string }>(
 export function mergeDatabases(
   local: Database,
   remote: Database,
+  now: Date = new Date(),
 ): { merged: Database; changed: boolean } {
   const tasks: Task[] = mergeById(local.tasks, remote.tasks);
   const lists: TaskList[] = mergeById(local.lists, remote.lists);
@@ -31,15 +33,20 @@ export function mergeDatabases(
   const localKeys = new Set(local.tasks.map((t) => t.id));
   const remoteKeys = new Set(remote.tasks.map((t) => t.id));
 
-  const merged: Database = {
-    schemaVersion: 1,
-    tasks,
-    lists,
-    settings: {
-      ...local.settings,
-      lastSyncAt: maxIso(local.settings.lastSyncAt, remote.settings.lastSyncAt),
+  // 多设备各自首启会创建不同 id 的同名收集箱，合并后统一去重
+  // （确定性：保留最早创建者，各设备算出同一结果，保持交换律/幂等）
+  const merged = dedupeInboxes(
+    {
+      schemaVersion: 1,
+      tasks,
+      lists,
+      settings: {
+        ...local.settings,
+        lastSyncAt: maxIso(local.settings.lastSyncAt, remote.settings.lastSyncAt),
+      },
     },
-  };
+    now,
+  );
 
   const changed =
     remoteKeys.size !== tasks.length ||
