@@ -190,4 +190,20 @@ describe("mergeDatabases — 永久删除墓碑（purged，清空回收站不复
     expect(twice.tasks).toEqual(once.tasks);
     expect(twice.purged).toEqual(once.purged);
   });
+
+  it("列表：30 天清扫的墓账本同样丢弃远端残影", () => {
+    const local = { ...db([], []), purged: { lold: T2 } };
+    const remote = db([], [{ ...list("lold", T1), deletedAt: T1 }]);
+    const { merged } = mergeDatabases(local, remote, NOW);
+    expect(merged.lists.map((l) => l.id)).not.toContain("lold");
+    expect(merged.purged).toEqual({ lold: T2 });
+  });
+
+  it("列表：墓碑后被修改 → 列表生效，账本条目撤销", () => {
+    const local = { ...db([], []), purged: { lold: T2 } };
+    const remote = db([], [{ ...list("lold", T3), deletedAt: null, name: "复活了" }]);
+    const { merged } = mergeDatabases(local, remote, NOW);
+    expect(merged.lists.map((l) => l.id)).toEqual(["lold"]);
+    expect(merged.purged).toEqual({});
+  });
 });

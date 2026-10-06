@@ -138,7 +138,30 @@ describe("tasks CRUD", () => {
     db = softDeleteTask(db, r.task.id, old);
     db = purgeOldTombstones(db, 30, T0);
     expect(db.tasks).toHaveLength(0);
+    // 过期回收站任务硬删除时写入永久删除账本（同步据此防复活）
+    expect(db.purged[r.task.id]).toBe(T0.toISOString());
+    // 未到期的软删除任务不受影响、不记账
+    let db3 = seed();
+    const r3 = createTask(db3, { title: "D", listId: db3.lists[0].id }, T0);
+    db3 = r3.db;
+    db3 = softDeleteTask(db3, r3.task.id, T0);
+    db3 = purgeOldTombstones(db3, 30, T0);
+    expect(db3.tasks).toHaveLength(1);
+    expect(db3.purged[r3.task.id]).toBeUndefined();
+  });
 
+  it("purgeOldTombstones 对过期列表墓碑同样记账", () => {
+    let db = seed();
+    const old = new Date(T0.getTime() - 40 * 86400000);
+    const r = createList(db, "临时", "#123456", "📦", old);
+    db = r.db;
+    db = softDeleteList(db, r.list.id, old);
+    db = purgeOldTombstones(db, 30, T0);
+    expect(db.lists.filter((l) => l.id === r.list.id)).toHaveLength(0);
+    expect(db.purged[r.list.id]).toBe(T0.toISOString());
+  });
+
+  it("purgeOldTombstones 保留未到期的软删除墓碑", () => {
     let db2 = seed();
     const r2 = createTask(db2, { title: "B", listId: db2.lists[0].id }, T0);
     db2 = r2.db;

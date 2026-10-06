@@ -289,7 +289,9 @@ export function emptyTrash(db: Database, now: Date = new Date()): Database {
   return { ...db, tasks: db.tasks.filter((t) => !t.deletedAt), purged };
 }
 
-/** 清理超过保留期的墓碑，防止数据无限膨胀 */
+/** 清理超过保留期的墓碑：回收站到期任务/列表硬删除并写入永久删除账本
+ *  （同步据此丢弃远端残影，否则"30 天自动清理"会被同步复活）；同时清理过期账本。
+ *  在应用启动时调用一次。 */
 export function purgeOldTombstones(
   db: Database,
   keepDays = 30,
@@ -299,20 +301,35 @@ export function purgeOldTombstones(
   // 永久删除账本保留更久（90 天）：账本条目在保留期内必然已传播到所有设备，
   // 过期后远端不可能再有该任务残影，丢弃才安全。
   const logCutoff = now.getTime() - PURGE_LOG_RETENTION_DAYS * 86400000;
-  const purged: Database["purged"] = {};
-  for (const [id, at] of Object.entries(db.purged)) {
-    if (new Date(at).getTime() > logCutoff) purged[id] = at;
+  const purged: Database["purged"] = { ...db.purged };
+  for (const [id, at] of Object.entries(purged)) {
+    if (new Date(at).getTime() <= logCutoff) delete purged[id];
   }
-  return {
-    ...db,
-    tasks: db.tasks.filter(
-      (t) => !t.deletedAt || new Date(t.deletedAt).getTime() > cutoff,
-    ),
-    lists: db.lists.filter(
-      (l) => !l.deletedAt || new Date(l.deletedAt).getTime() > cutoff,
-    ),
-    purged,
-  };
+
+  // 到期的软删除墓碑 → 硬删除 + 记入永久删除账本（账本时间用 now：
+  // 此刻执行清理，必须压过任务在任何设备上的旧副本 updatedAt）
+  const ts = nowIso(now);
+  let swept = false;
+  const tasks = db.tasks.filter((t) => {
+    if (!t.deletedAt) return true;
+    if (new Date(t.deletedAt).getTime() > cutoff) return true;
+    purged[t.id] = ts;
+    swept = true;
+    return false;
+  });
+  const lists = db.lists.filter((l) => {
+    if (!l.deletedAt) return true;
+    if (new Date(l.deletedAt).getTime() > cutoff) return true;
+    purged[l.id] = ts;
+    swept = true;
+    return false;
+  });
+
+  // 无事发生时返回原引用，避免启动时触发无意义的持久化/同步
+  if (!swept && Object.keys(purged).length === Object.keys(db.purged).length) {
+    return db;
+  }
+  return { ...db, tasks, lists, purged };
 }
 
 /**

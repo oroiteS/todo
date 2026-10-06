@@ -47,7 +47,16 @@ export function mergeDatabases(
     // 墓碑生效：丢弃远端（或本地）残影，否则清空的回收站会在同步后复活
     return false;
   });
-  const lists: TaskList[] = mergeById(local.lists, remote.lists);
+  const lists: TaskList[] = mergeById(local.lists, remote.lists).filter((l) => {
+    const at = purged[l.id];
+    if (at === undefined) return true;
+    if (l.updatedAt > at) {
+      delete purged[l.id];
+      return true;
+    }
+    // 列表被 30 天清扫/彻底删除后，丢弃远端残影
+    return false;
+  });
 
   const localKeys = new Set(local.tasks.map((t) => t.id));
   const remoteKeys = new Set(remote.tasks.map((t) => t.id));

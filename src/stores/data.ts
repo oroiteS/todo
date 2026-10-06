@@ -128,11 +128,16 @@ export const useDataStore = create<DataStore>((set, get) => {
       let db: Database;
       try {
         const raw = await storage.load();
-        db = raw ? ops.normalizeDatabase(raw) : ops.ensureInbox(ops.emptyDatabase());
+        db = raw ? ops.normalizeDatabase(raw) : ops.emptyDatabase();
       } catch (err) {
         console.error("[data] load failed:", err);
-        db = ops.ensureInbox(ops.emptyDatabase());
+        db = ops.emptyDatabase();
       }
+      // 启动清扫：回收站保留期满（30 天）的任务/列表硬删除并记入永久删除
+      // 账本（同步据此丢弃远端残影），同时清理过期账本条目——「保留 30 天
+      // 后自动清理」由此生效。
+      db = ops.purgeOldTombstones(db);
+      db = ops.ensureInbox(db);
       set({ db, loaded: true });
       applyTheme(db.settings);
       if (!db.lists.length) {
