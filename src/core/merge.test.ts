@@ -143,3 +143,51 @@ describe("mergeDatabases / 收集箱去重", () => {
     expect(merged.lists.find((l) => l.id === "inbox-a")?.deletedAt).toBeNull();
   });
 });
+
+describe("mergeDatabases — 永久删除墓碑（purged，清空回收站不复活）", () => {
+  const NOW = new Date("2026-01-14T12:00:00.000Z");
+
+  it("回归：本地清空回收站后，远端残影不复活", () => {
+    // macOS 清空回收站（硬删 + 墓碑），Android 还在用旧快照（任务仍在）
+    const local = { ...db([]), purged: { x: T2 } };
+    const remote = db([task("x", T1, { deletedAt: T1 })]);
+    const { merged, changed } = mergeDatabases(local, remote, NOW);
+    expect(merged.tasks.map((t) => t.id)).not.toContain("x");
+    expect(merged.purged).toEqual({ x: T2 });
+    expect(changed).toBe(true); // 需要把墓碑推给远端
+  });
+
+  it("两侧各自硬删不同任务：墓碑并集，残影全丢", () => {
+    const local = { ...db([task("b", T1, { deletedAt: T1 })]), purged: { a: T2 } };
+    const remote = { ...db([task("a", T1, { deletedAt: T1 })]), purged: { b: T2 } };
+    const { merged } = mergeDatabases(local, remote, NOW);
+    expect(merged.tasks).toHaveLength(0);
+    expect(merged.purged).toEqual({ a: T2, b: T2 });
+  });
+
+  it("墓碑之后任务又被修改/恢复 → 任务生效，墓碑撤销", () => {
+    // Android 在墓碑时间之后恢复了任务（updatedAt 更新）→ 恢复赢，不摆
+    const local = { ...db([]), purged: { x: T2 } };
+    const remote = db([task("x", T3, { deletedAt: null, title: "改了" })]);
+    const { merged } = mergeDatabases(local, remote, NOW);
+    expect(merged.tasks.map((t) => t.id)).toEqual(["x"]);
+    expect(merged.tasks[0]?.title).toBe("改了");
+    expect(merged.purged).toEqual({});
+  });
+
+  it("墓碑与任务 updatedAt 相等也算删除生效", () => {
+    const local = { ...db([]), purged: { x: T1 } };
+    const remote = db([task("x", T1)]);
+    const { merged } = mergeDatabases(local, remote, NOW);
+    expect(merged.tasks).toHaveLength(0);
+  });
+
+  it("幂等：合并结果再与远端合并，结果不变", () => {
+    const local = { ...db([]), purged: { x: T2 } };
+    const remote = db([task("x", T1, { deletedAt: T1 })]);
+    const once = mergeDatabases(local, remote, NOW).merged;
+    const twice = mergeDatabases(once, remote, NOW).merged;
+    expect(twice.tasks).toEqual(once.tasks);
+    expect(twice.purged).toEqual(once.purged);
+  });
+});

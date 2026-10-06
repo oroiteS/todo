@@ -5,6 +5,9 @@ import { DEFAULT_INBOX_ID, DEFAULT_INBOX_NAME, DEFAULT_PROXY } from "./models";
 import { newId } from "./ids";
 import { todayStr, isToday, isOverdue, diffDays } from "./dates";
 
+/** 永久删除墓碑账本的保留天数（超期条目必然已传播到所有设备，丢弃安全） */
+const PURGE_LOG_RETENTION_DAYS = 90;
+
 export function nowIso(now: Date = new Date()): string {
   return now.toISOString();
 }
@@ -14,6 +17,7 @@ export function emptyDatabase(now: Date = new Date()): Database {
     schemaVersion: 1,
     tasks: [],
     lists: [],
+    purged: {},
     settings: {
       theme: "system",
       accent: "rose",
@@ -84,6 +88,12 @@ export function normalizeDatabase(raw: unknown, now: Date = new Date()): Databas
       github: obj.settings.github ?? null,
       lastSyncAt: obj.settings.lastSyncAt ?? null,
     };
+  }
+  // 永久删除墓碑账本（旧版本数据无此字段 → 空账本）
+  if (obj.purged && typeof obj.purged === "object") {
+    for (const [id, at] of Object.entries(obj.purged)) {
+      if (typeof at === "string") db.purged[id] = at;
+    }
   }
   return dedupeInboxes(db, now);
 }
@@ -261,12 +271,22 @@ export function restoreTask(
   };
 }
 
-export function purgeTask(db: Database, id: ID): Database {
-  return { ...db, tasks: db.tasks.filter((t) => t.id !== id) };
+export function purgeTask(db: Database, id: ID, now: Date = new Date()): Database {
+  return {
+    ...db,
+    tasks: db.tasks.filter((t) => t.id !== id),
+    purged: { ...db.purged, [id]: nowIso(now) },
+  };
 }
 
-export function emptyTrash(db: Database): Database {
-  return { ...db, tasks: db.tasks.filter((t) => !t.deletedAt) };
+/** 清空回收站：硬删除所有软删除任务，并写入永久删除墓碑（同步据此丢弃远端残影） */
+export function emptyTrash(db: Database, now: Date = new Date()): Database {
+  const ts = nowIso(now);
+  const purged = { ...db.purged };
+  for (const t of db.tasks) {
+    if (t.deletedAt) purged[t.id] = ts;
+  }
+  return { ...db, tasks: db.tasks.filter((t) => !t.deletedAt), purged };
 }
 
 /** 清理超过保留期的墓碑，防止数据无限膨胀 */
@@ -276,6 +296,13 @@ export function purgeOldTombstones(
   now: Date = new Date(),
 ): Database {
   const cutoff = now.getTime() - keepDays * 86400000;
+  // 永久删除账本保留更久（90 天）：账本条目在保留期内必然已传播到所有设备，
+  // 过期后远端不可能再有该任务残影，丢弃才安全。
+  const logCutoff = now.getTime() - PURGE_LOG_RETENTION_DAYS * 86400000;
+  const purged: Database["purged"] = {};
+  for (const [id, at] of Object.entries(db.purged)) {
+    if (new Date(at).getTime() > logCutoff) purged[id] = at;
+  }
   return {
     ...db,
     tasks: db.tasks.filter(
@@ -284,6 +311,7 @@ export function purgeOldTombstones(
     lists: db.lists.filter(
       (l) => !l.deletedAt || new Date(l.deletedAt).getTime() > cutoff,
     ),
+    purged,
   };
 }
 

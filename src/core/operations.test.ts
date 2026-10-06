@@ -9,6 +9,7 @@ import {
   ensureInbox,
   normalizeDatabase,
   purgeOldTombstones,
+  purgeTask,
   restoreTask,
   reorderTask,
   searchTasks,
@@ -92,6 +93,40 @@ describe("tasks CRUD", () => {
     db = softDeleteTask(db, r.task.id, T0);
     db = emptyTrash(db);
     expect(db.tasks).toHaveLength(0);
+  });
+
+  it("清空回收站 / 彻底删除会写入永久删除墓碑（同步合并据此防复活）", () => {
+    let db = seed();
+    const inbox = db.lists[0];
+    const r1 = createTask(db, { title: "A", listId: inbox.id }, T0);
+    db = r1.db;
+    const r2 = createTask(db, { title: "B", listId: inbox.id }, T0);
+    db = r2.db;
+    db = softDeleteTask(db, r1.task.id, T0);
+    db = softDeleteTask(db, r2.task.id, T0);
+
+    const later = new Date(T0.getTime() + 60000);
+    db = emptyTrash(db, later);
+    expect(db.tasks).toHaveLength(0);
+    expect(db.purged[r1.task.id]).toBe(later.toISOString());
+    expect(db.purged[r2.task.id]).toBe(later.toISOString());
+
+    // 彻底删除单条同样记账
+    const r3 = createTask(db, { title: "C", listId: inbox.id }, T0);
+    db = r3.db;
+    db = softDeleteTask(db, r3.task.id, T0);
+    const evenLater = new Date(T0.getTime() + 120000);
+    db = purgeTask(db, r3.task.id, evenLater);
+    expect(db.tasks).toHaveLength(0);
+    expect(db.purged[r3.task.id]).toBe(evenLater.toISOString());
+  });
+
+  it("purgeOldTombstones 同时清理过期的永久删除账本条目", () => {
+    let db = seed();
+    const stale = new Date(T0.getTime() - 91 * 86400000);
+    db = { ...db, purged: { stale: stale.toISOString(), fresh: T0.toISOString() } };
+    db = purgeOldTombstones(db, 30, T0);
+    expect(db.purged).toEqual({ fresh: T0.toISOString() });
   });
 
   it("purgeOldTombstones 清理过期墓碑", () => {

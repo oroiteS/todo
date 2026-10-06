@@ -113,6 +113,14 @@ export interface Database {
   tasks: Task[];
   lists: TaskList[];
   settings: Settings;
+  /**
+   * 永久删除墓碑账本：任务 id → 删除时间（ISO）。
+   * 「彻底删除/清空回收站」是硬删除（任务从数组移除），而同步合并是按 id 并集，
+   * 无法区分"缺失=删除"还是"远端陈旧"——没有这本账，清空的回收站会在下次同步复活。
+   * 合并规则：两侧并集、同 id 取较新时间；墓碑晚于任务 updatedAt → 删除生效；
+   * 任务在墓碑之后又被修改 → 任务生效并撤销该墓碑（谁的事件新谁赢，收敛）。
+   */
+  purged: Record<string, string>;
 }
 
 /** 默认列表可选的配色与 emoji */
