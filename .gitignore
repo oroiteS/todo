@@ -34,3 +34,4 @@ src-tauri/gen/android/.kotlin/
 
 # pnpm 本地缓存(误入库,见 5fa5a36 之前的提交)
 .pnpm-store
+.e2e-data-backup.json
