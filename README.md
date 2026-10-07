@@ -8,9 +8,12 @@
 - **智能输入**：`明天 交报告 #工作 !高` 一行搞定日期 / 列表 / 优先级
 - **桌面小组件**：Android（AppWidget）展示「离今天最近的 8 个任务」，数据变更**实时刷新**；macOS 端（WidgetKit）已开发但被系统枚举阻塞暂不可用（[docs/widget-adaptation.md](docs/widget-adaptation.md) §4.5）
 
-## 开发状态（v0.4.4 · 2026-10）
+## 开发状态（v0.6.0 · 2026-10）
 
 三端可用。Android 端近期集中打磨完毕，均已实机验证：
+
+- ✅ **单实例单开（v0.6.0）**——二次启动 exe 不再开新窗口，由首实例唤起已有主窗口（微信式；Windows 命名 mutex 判重 + WM_COPYDATA 转发，第二实例退出前 AllowSetForegroundWindow 转让前台权）
+- ✅ **Windows 便携版（v0.6.0）**——portable zip 解压（含 U 盘）即用，任务数据写在 exe 旁 `data\` 随程序移动；`.portable` 标记切换便携/系统存储，与安装版共用单实例锁
 
 - ✅ **移动端快速输入**——`<form>` 隐式提交 + 常驻提交按钮，软键盘"回车/完成"与中文输入法全兼容
 - ✅ **小组件实时刷新**——数据变更后 JNI 直调 `AppWidgetManager.updateAppWidget`（含 R8 keep 规则防裁剪，30 分钟系统轮询兜底）
