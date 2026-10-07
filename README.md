@@ -75,6 +75,21 @@ cask 由 tap 仓库的定时 workflow 跟随最新 Release 自动更新 `version
 brew update && brew upgrade
 ```
 
+### Windows（安装版 / 便携版）
+
+Release 提供 `todolite-windows-x64` 产物，两选一：
+
+- **安装版**
+  - `_x64-setup.exe`（NSIS）：免管理员权限，默认装到 `%LOCALAPPDATA%\TodoLite`，向导可自选目录
+  - `.msi`（WiX）：per-machine，装到 `C:\Program Files\TodoLite`，适合企业部署
+- **便携版（portable）**：解压 `TodoLite-windows-x64-portable.zip` 到任意目录（含 U 盘）直接运行 `TodoLite.exe`
+  - 数据写在 exe 旁的 `data\` 文件夹，随程序移动，删除 `data` 即完全重置
+  - 目录内 `.portable` 是便携模式标记，删掉后退回系统 AppData 存数据
+  - 与安装版共用单实例锁，同时只会运行先启动的那个；WebDAV 密码存 Windows 凭据管理器（跟随系统账户）
+
+两种安装方式都会在 `%APPDATA%\com.syn.todolite\` 写任务数据（便携版除外），
+卸载默认保留该目录，重装不丢数据。
+
 ### Linux（AppImage / deb / rpm）
 
 从 [Releases](https://github.com/oroiteS/todo/releases) 下载对应产物：

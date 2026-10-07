@@ -5,14 +5,14 @@ use serde_json::Value;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
-use tauri::Manager;
 
 const DATA_FILE: &str = "todolite-data.json";
 const BACKUP_COUNT: usize = 5;
 const SECRET_SERVICE: &str = "todolite";
 
 fn data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    // 便携模式（exe 旁有 .portable 标记）写 exe 旁 data/，否则系统 AppData（见 paths.rs）
+    let dir = crate::paths::data_dir(app)?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
 }

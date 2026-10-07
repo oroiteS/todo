@@ -1,6 +1,6 @@
 [package]
 name = "todolite"
-version = "0.5.0"
+version = "0.5.1"
 description = "TodoLite — 轻量、好看的跨平台待办清单"
 authors = ["syn"]
 edition = "2021"
@@ -29,6 +29,13 @@ chrono = { version = "0.4", default-features = false, features = ["clock"] }
 # Android 端不依赖 keyring，使用应用私有目录文件存储（见 commands.rs）
 [target.'cfg(not(target_os = "android"))'.dependencies]
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+
+# 桌面端：单实例。二次启动 exe 不开新进程，由首实例唤起已有主窗口（微信式单开）。
+# 插件内部即调研报告所述方案：Windows 用命名 mutex 判重 + WM_COPYDATA 转发参数，
+# 第二实例退出前 AllowSetForegroundWindow 把前台权让给首实例。
+# 注意：lib.rs 中该插件必须第一个注册（官方要求）。
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "2"
 
 # Android 端：小组件即时刷新——写快照后经 wry 的 JNI dispatch 直调
 # TodoliteWidgetProvider.refreshAll(context)，绕过 30 分钟系统轮询。

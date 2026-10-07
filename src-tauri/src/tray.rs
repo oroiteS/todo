@@ -33,7 +33,7 @@ const MAX_CHARS: usize = 18;
 /// 文件缺失/损坏时静默返回空，菜单照常可用。
 fn menu_data(app: &AppHandle) -> (u32, u32, Vec<String>) {
     let empty = (0, 0, Vec::new());
-    let Ok(dir) = app.path().app_data_dir() else {
+    let Ok(dir) = crate::paths::data_dir(app) else {
         return empty;
     };
     let Ok(text) = std::fs::read_to_string(dir.join(DATA_FILE)) else {

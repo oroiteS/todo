@@ -1,11 +1,25 @@
 mod commands;
+mod paths;
 #[cfg(desktop)]
 mod tray;
 mod widget;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    // 单实例（微信式单开，仅桌面端）：二次启动 exe 不再开新进程新窗口，
+    // 而是由首实例把已有主窗口唤到前台（show + unminimize + set_focus）。
+    // 底层即调研报告方案：Windows 命名 mutex 判重 + WM_COPYDATA 转发，
+    // 第二实例退出前 AllowSetForegroundWindow 把前台权让给首实例。
+    // 官方要求：single-instance 必须是第一个注册的插件。
+    let mut builder = tauri::Builder::default();
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            // 与托盘「打开 TodoLite」同一激活路径
+            tray::show_main(app);
+        }));
+    }
+    builder
         .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![
             commands::read_database,

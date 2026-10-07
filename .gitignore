@@ -24,6 +24,7 @@ src-tauri/gen/android/app/tauri.build.gradle.kts
 android-widget-跨平台调研/
 widget_research/
 macOS组件开发与免签名可行性调研.md
+Windows单实例启动调研报告.md
 
 # IDE 配置(个人环境,不入库)
 .idea/

@@ -90,6 +90,33 @@ jobs:
       - name: Build desktop bundles
         run: pnpm tauri build ${{ matrix.args }}
 
+      # Windows 便携版：Tauri 前端资源内嵌进 exe，裸 exe 即绿色版；
+      # 预置 .portable 标记（paths.rs 检测）让数据写在 exe 旁 data/ 而非 AppData。
+      # zip 放进 bundle 目录，随下方 artifact 上传一步带出。
+      - name: Package portable build (Windows)
+        if: matrix.label == 'windows-x64'
+        shell: pwsh
+        run: |
+          $exe = "src-tauri/target/release/TodoLite.exe"
+          if (!(Test-Path $exe)) { $exe = "src-tauri/target/release/todolite.exe" }
+          if (!(Test-Path $exe)) { throw "portable: 未找到 release exe" }
+          $stage = "src-tauri/target/release/bundle/portable/TodoLite"
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item $exe "$stage/TodoLite.exe"
+          New-Item -ItemType File "$stage/.portable" | Out-Null
+          @'
+          TodoLite 便携版（portable）
+          - 解压到任意目录后运行 TodoLite.exe（需系统已装 WebView2，Win10 1803+/Win11 自带）
+          - 数据保存在本目录的 data 文件夹内，随程序一起移动；删除 data 即完全重置
+          - .portable 是便携模式标记文件，请勿删除（删掉后退回系统 AppData 存数据）
+          - 与安装版共用单实例锁：两者同时只会运行先启动的那个
+          - WebDAV 密码存于 Windows 凭据管理器（跟随系统账户，不随 data 目录移动）
+          '@ | Out-File -Encoding utf8 "$stage/README.txt"
+          Compress-Archive -Path $stage `
+            -DestinationPath "src-tauri/target/release/bundle/portable/TodoLite-windows-x64-portable.zip" `
+            -Force
+          Remove-Item -Recurse -Force $stage
+
       - name: Run frontend tests
         run: pnpm test
 
