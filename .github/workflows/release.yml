@@ -243,4 +243,5 @@ jobs:
             release-files/**/*.AppImage
             release-files/**/*.deb
             release-files/**/*.rpm
+            release-files/**/*.zip
           generate_release_notes: true
