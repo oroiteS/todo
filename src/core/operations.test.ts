@@ -393,6 +393,59 @@ describe("ensureInbox / 收集箱固定 id", () => {
     expect(live[0].id).not.toBe("inbox");
     expect(live[0].name).toBe("收集箱");
   });
+
+  it("收集箱改名后不再按名字重建（回归：改名成杂项后每次启动 resurrect）", () => {
+    // 老版本数据：收集箱是随机 id（v0.4.2 之前无固定 id），用户已改名「杂项」
+    const renamed = {
+      id: "list_old_random_id",
+      name: "杂项",
+      color: "#0d9488",
+      emoji: "📋",
+      sortOrder: 0,
+      createdAt: "2025-06-01T00:00:00.000Z",
+      updatedAt: "2026-01-14T00:00:00.000Z",
+      deletedAt: null,
+    };
+    const db = ensureInbox({ ...emptyDatabase(T0), lists: [renamed] }, T0);
+    expect(db.lists).toHaveLength(1); // 不新建「收集箱」
+    expect(db.lists[0].name).toBe("杂项");
+  });
+
+  it("改名 + 固定 id 墓碑并存：有活列表就不创建", () => {
+    // 用户曾删过 resurrect 出来的固定 id 收集箱（墓碑留在数据里），改名列表仍在
+    const renamed = {
+      id: "list_old_random_id",
+      name: "杂项",
+      color: "#0d9488",
+      emoji: "📋",
+      sortOrder: 0,
+      createdAt: "2025-06-01T00:00:00.000Z",
+      updatedAt: "2026-01-14T00:00:00.000Z",
+      deletedAt: null,
+    };
+    const tombstone = {
+      ...ensureInbox(emptyDatabase(T0), T0).lists[0],
+      deletedAt: "2026-01-13T00:00:00.000Z",
+      updatedAt: "2026-01-13T00:00:00.000Z",
+    };
+    const db = ensureInbox(
+      { ...emptyDatabase(T0), lists: [renamed, tombstone] },
+      T0,
+    );
+    expect(db.lists.filter((l) => !l.deletedAt)).toHaveLength(1);
+    expect(db.lists.filter((l) => !l.deletedAt)[0].name).toBe("杂项");
+  });
+
+  it("用户删光所有列表：重建起始收集箱（quick-add 需要落点）", () => {
+    const allDeleted = ensureInbox(emptyDatabase(T0), T0).lists.map((l) => ({
+      ...l,
+      deletedAt: "2026-01-14T09:00:00.000Z",
+      updatedAt: "2026-01-14T09:00:00.000Z",
+    }));
+    const db = ensureInbox({ ...emptyDatabase(T0), lists: allDeleted }, T0);
+    const live = db.lists.filter((l) => !l.deletedAt);
+    expect(live).toHaveLength(1);
+  });
 });
 
 describe("normalizeDatabase / 收集箱去重", () => {
