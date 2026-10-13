@@ -10,6 +10,7 @@ import {
   upcomingTasks,
 } from "@/core/operations";
 import { todayStr } from "@/core/dates";
+import { recurringDone } from "@/core/repeat";
 import { useDataStore } from "@/stores/data";
 import { useUiStore } from "@/stores/ui";
 import { cn } from "@/lib/cn";
@@ -64,7 +65,10 @@ export function TaskListPane() {
     if (view.id === "today") {
       tasks = todayTasks(db, today);
       title = "今天";
-      overdueCount = tasks.filter((t) => t.dueDate && t.dueDate < today).length;
+      // 重复任务永不过期（当期发生日口径），不计入逾期
+      overdueCount = tasks.filter(
+        (t) => !t.repeat && t.dueDate && t.dueDate < today,
+      ).length;
     } else if (view.id === "upcoming") {
       tasks = upcomingTasks(db, today);
       title = "计划";
@@ -90,6 +94,10 @@ export function TaskListPane() {
 
   const active = tasks.filter((t) => !t.completedAt);
   const done = tasks.filter((t) => t.completedAt);
+  // 重复任务的打卡完成不计入 done 区（原位划掉），但计入进度胶囊——
+  // 与小组件「已完成 N」同口径
+  const recurringDoneCount = tasks.filter((t) => recurringDone(t, today)).length;
+  const doneCount = done.length + recurringDoneCount;
   const activeIds = active.map((t) => t.id);
   const allowDrag = mode === "normal" && view.kind === "list" && viewExists;
   const showListChips = mode === "search" || view.kind === "smart";
@@ -212,13 +220,13 @@ export function TaskListPane() {
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{
-              width: `${(done.length / total) * 100}%`,
+              width: `${total > 0 ? (doneCount / total) * 100 : 0}%`,
               background: "linear-gradient(90deg,#f97316,var(--accent))",
             }}
           />
         </div>
         <span className="text-[11px] tabular-nums text-ink2">
-          {done.length}/{total} 已完成
+          {doneCount}/{total} 已完成
         </span>
       </div>
     ) : null;

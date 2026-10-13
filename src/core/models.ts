@@ -5,18 +5,39 @@ export type ID = string;
 /** 优先级：0 无 / 1 低 / 2 中 / 3 高 */
 export type Priority = 0 | 1 | 2 | 3;
 
+/**
+ * 重复规则（长期任务）。只做四种枚举，刻意不上 RFC5545 rrule。
+ * 字段全部可序列化、可测试；新增 kind 只能是加法（旧客户端透传保留，见 normalizeDatabase）。
+ */
+export type RepeatRule =
+  | { kind: "daily" }
+  /** 每周重复；dow 取 JS getDay 口径：0=周日 … 6=周六 */
+  | { kind: "weekly"; dow: number }
+  /** 每月第 N 日；N 为 1-31，大月无该日时钳制到月末（1月31日 → 2月28/29日） */
+  | { kind: "monthly"; day: number }
+  /** 每个工作日（周一至周五） */
+  | { kind: "workday" };
+
 export interface Task {
   id: ID;
   listId: ID;
   title: string;
   notes?: string;
-  /** 本地日期 "yyyy-MM-dd" */
+  /** 本地日期 "yyyy-MM-dd"；重复任务里语义是「当前期的发生日锚点」 */
   dueDate?: string;
   priority?: Priority;
   /** 分数排序：插入取相邻中点 */
   sortOrder: number;
-  /** 完成时间（ISO datetime），null 表示未完成 */
+  /** 完成时间（ISO datetime），null 表示未完成；重复任务恒为 null（完成走 doneLog） */
   completedAt?: string | null;
+  /**
+   * 重复任务的完成记录：发生日 "yyyy-MM-dd" 追加去重，封顶 50 条。
+   * 展示层的「划掉到下一次发生日」由它 + dueDate 推导（core/repeat.ts recurringDone），
+   * 跨 0 点复原不需要任何后台刷新。非重复任务不使用。
+   */
+  doneLog?: string[];
+  /** 重复规则；缺省 = 普通一次性任务 */
+  repeat?: RepeatRule;
   createdAt: string;
   updatedAt: string;
   /** 软删除墓碑（回收站） */

@@ -102,3 +102,67 @@ describe("parseQuickAdd", () => {
     expect(r.listQuery).toBeUndefined();
   });
 });
+
+describe("parseQuickAdd 重复词", () => {
+  it("每天/每日：daily", () => {
+    expect(parseQuickAdd("每天 背单词", NOW)).toMatchObject({
+      title: "背单词",
+      repeat: { kind: "daily" },
+      dueDate: undefined,
+    });
+    expect(parseQuickAdd("每日复盘", NOW).repeat).toEqual({ kind: "daily" });
+  });
+
+  it("每周X：weekly（含紧贴与全星期写法）", () => {
+    expect(parseQuickAdd("每周二 组会", NOW)).toMatchObject({
+      title: "组会",
+      repeat: { kind: "weekly", dow: 2 },
+    });
+    expect(parseQuickAdd("每个周日报纸", NOW).repeat).toEqual({ kind: "weekly", dow: 0 });
+  });
+
+  it("每月N日/号：monthly（限 1-31）", () => {
+    expect(parseQuickAdd("每月1号 缴费", NOW)).toMatchObject({
+      title: "缴费",
+      repeat: { kind: "monthly", day: 1 },
+    });
+    expect(parseQuickAdd("每月15日 交房租", NOW).repeat).toEqual({
+      kind: "monthly",
+      day: 15,
+    });
+    // 32号 不合法：整体不消费，保留在标题
+    const bad = parseQuickAdd("每月32号 见", NOW);
+    expect(bad.repeat).toBeUndefined();
+    expect(bad.title).toBe("每月32号 见");
+  });
+
+  it("工作日：workday", () => {
+    expect(parseQuickAdd("工作日 写日报", NOW)).toMatchObject({
+      title: "写日报",
+      repeat: { kind: "workday" },
+    });
+  });
+
+  it("与优先级/列表可组合", () => {
+    // 每周五 整体被重复词消费；首期锚点由 createTask 按规则补（最近一个周五）
+    const r = parseQuickAdd("每周五 交周报 !高 #工作", NOW);
+    expect(r).toMatchObject({
+      title: "交周报",
+      priority: 3,
+      listQuery: "工作",
+      repeat: { kind: "weekly", dow: 5 },
+    });
+    // 重复词之后还能再吃日期词：明天作为 daily 的锚点
+    expect(parseQuickAdd("每天 明天 交作业", NOW)).toMatchObject({
+      title: "交作业",
+      dueDate: "2026-01-15",
+      repeat: { kind: "daily" },
+    });
+  });
+
+  it("「每周」不带星期几：语义不明，不消费（留在标题）", () => {
+    const r = parseQuickAdd("每周 组会", NOW);
+    expect(r.repeat).toBeUndefined();
+    expect(r.title).toBe("每周 组会");
+  });
+});

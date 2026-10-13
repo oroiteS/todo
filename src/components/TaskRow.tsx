@@ -1,6 +1,7 @@
-import { FileText, Flag, GripVertical, Undo2, X } from "lucide-react";
+import { FileText, Flag, GripVertical, Repeat, Undo2, X } from "lucide-react";
 import type { Task, TaskList } from "@/core/models";
 import { formatDue, isOverdue, isToday, todayStr } from "@/core/dates";
+import { effectiveDue, formatRepeat, recurringDone } from "@/core/repeat";
 import { cn } from "@/lib/cn";
 import { Checkbox } from "./Checkbox";
 
@@ -24,7 +25,11 @@ interface Props {
 
 export function TaskRow(p: Props) {
   const { task } = p;
-  const done = !!task.completedAt;
+  // 重复任务的「打卡完成」态：completedAt 恒空，由 doneLog + dueDate 推导
+  // （勾掉后划掉到下一次发生日的 0 点，跨天自动复原，无需任何刷新）
+  const today = todayStr();
+  const recurringFinished = task.repeat ? recurringDone(task, today) : false;
+  const done = !!task.completedAt || recurringFinished;
 
   return (
     <div
@@ -140,16 +145,35 @@ function RowChips({
   list?: TaskList;
   showList?: boolean;
 }) {
-  const done = !!task.completedAt;
-  const due = task.dueDate;
+  const today = todayStr();
+  const recurringFinished = task.repeat ? recurringDone(task, today) : false;
+  const done = !!task.completedAt || recurringFinished;
+  // 重复任务按当期发生日口径展示（拖了没打卡显示今天/未来，不显示逾期）；
+  // 打卡态下隐藏日期角标，只留重复角标（划掉行更干净）
+  const due = task.repeat
+    ? recurringFinished
+      ? undefined
+      : effectiveDue(task, today)
+    : task.dueDate;
   const hasNotes = !!task.notes?.trim();
-  if ((!showList || !list) && !due && !hasNotes) return null;
+  if ((!showList || !list) && !due && !hasNotes && !task.repeat) return null;
 
-  const overdue = !done && !!due && isOverdue(due);
-  const today = !done && !!due && isToday(due, todayStr());
+  const overdue = !done && !!due && !task.repeat && isOverdue(due, today);
+  const todayDue = !done && !!due && isToday(due, today);
 
   return (
     <div className="mt-1 flex flex-wrap items-center gap-1.5">
+      {task.repeat && (
+        <span
+          className={cn(
+            "flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-medium",
+            recurringFinished ? "bg-ok/10 text-ok" : "bg-accent-soft text-accent",
+          )}
+        >
+          <Repeat size={10} />
+          {formatRepeat(task.repeat)}
+        </span>
+      )}
       {showList && list && (
         <span className="flex items-center gap-1 text-[11px] text-ink2">
           <span
@@ -165,12 +189,12 @@ function RowChips({
             "rounded-md px-1.5 py-0.5 text-[11px] font-medium",
             overdue
               ? "bg-danger/10 text-danger"
-              : today
+              : todayDue
                 ? "bg-warn/10 text-warn"
                 : "bg-ink3/10 text-ink2",
           )}
         >
-          {formatDue(due)}
+          {formatDue(due, today)}
         </span>
       )}
       {hasNotes && (

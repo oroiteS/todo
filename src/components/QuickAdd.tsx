@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { ArrowUp, CircleHelp, Plus } from "lucide-react";
 import { parseQuickAdd } from "@/core/quickparse";
 import { formatDue } from "@/core/dates";
+import { formatRepeat } from "@/core/repeat";
 import { visibleLists } from "@/core/operations";
 import { useDataStore } from "@/stores/data";
 import { useUiStore } from "@/stores/ui";
@@ -152,6 +153,26 @@ function HelpPopover() {
               </p>
             </section>
 
+            <section className="mt-2.5">
+              <p className="text-[11px] font-semibold tracking-widest text-ink3">
+                重复 · 写在开头
+              </p>
+              <ul className="mt-1 space-y-1 text-[12px] leading-relaxed text-ink2">
+                <li>
+                  <Kbd>每天</Kbd> <Kbd>工作日</Kbd>（如 <Kbd>每天 背单词</Kbd>）
+                </li>
+                <li>
+                  <Kbd>每周二</Kbd>（如 <Kbd>每周二 组会</Kbd>）
+                </li>
+                <li>
+                  <Kbd>每月1号</Kbd>（1-31，如 <Kbd>每月1号 缴费</Kbd>）
+                </li>
+                <li>
+                  勾选完成自动滚到下一期；划掉持续到当期结束（每天任务到次日 0 点）
+                </li>
+              </ul>
+            </section>
+
             <div className="mt-2.5 rounded-lg bg-panel2/60 p-2">
               <p className="text-[10px] font-semibold tracking-widest text-ink3">
                 示例
@@ -159,6 +180,8 @@ function HelpPopover() {
               <ul className="mt-1 space-y-0.5 text-[12px] text-ink">
                 <li>明天 交作业 !高 #英语</li>
                 <li>周五 组会 !!</li>
+                <li>每周二 组会</li>
+                <li>每月1号 缴费</li>
                 <li>2026/10/8 体检</li>
               </ul>
             </div>
@@ -213,6 +236,7 @@ export function QuickAdd({ currentListId }: { currentListId?: string }) {
       dueDate: parsed.dueDate,
       priority: parsed.priority,
       listId,
+      repeat: parsed.repeat,
     });
     setText("");
     inputRef.current?.focus();
@@ -235,7 +259,8 @@ export function QuickAdd({ currentListId }: { currentListId?: string }) {
     );
   }, [parsed, lists]);
   const showPreview =
-    !!parsed && (!!parsed.dueDate || !!parsed.priority || !!parsed.listQuery);
+    !!parsed &&
+    (!!parsed.dueDate || !!parsed.priority || !!parsed.listQuery || !!parsed.repeat);
 
   return (
     <form
@@ -286,6 +311,11 @@ export function QuickAdd({ currentListId }: { currentListId?: string }) {
         // 语法速查：日期词在开头（今天/明天/后天/周X/下周X/M月D日/M/D），
         // !低/!中/!高（或 !/!!/!!!）= 优先级，#列表名 = 加入已有列表
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-[25px] text-[11px]">
+          {parsed.repeat && (
+            <span className="rounded-md bg-panel2/70 px-1.5 py-0.5 text-accent">
+              {formatRepeat(parsed.repeat)}重复
+            </span>
+          )}
           {parsed.dueDate && (
             <span className="rounded-md bg-panel2/70 px-1.5 py-0.5 text-ink2">
               到期 {formatDue(parsed.dueDate)}

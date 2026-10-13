@@ -1,7 +1,8 @@
 import { useEffect, useRef, type ComponentProps } from "react";
 import { Check, Trash2, X } from "lucide-react";
-import type { Priority, Task } from "@/core/models";
+import type { Priority, RepeatRule, Task } from "@/core/models";
 import { addDays, mondayBasedDow, todayStr } from "@/core/dates";
+import { formatRepeat, recurringDone } from "@/core/repeat";
 import { listById, visibleLists } from "@/core/operations";
 import { useDataStore } from "@/stores/data";
 import { useUiStore } from "@/stores/ui";
@@ -58,8 +59,11 @@ export function DetailPane() {
   const today = todayStr();
   const nextMonday = addDays(today, ((7 - mondayBasedDow(new Date())) % 7) || 7);
 
-  const patch = (p: Partial<Pick<Task, "title" | "notes" | "dueDate" | "priority" | "listId">>) =>
-    updateTask(task.id, p);
+  const patch = (
+    p: Partial<Pick<Task, "title" | "notes" | "dueDate" | "priority" | "listId" | "repeat">>,
+  ) => updateTask(task.id, p);
+
+  const repeatDone = task.repeat ? recurringDone(task, today) : false;
 
   const createdAt = new Date(task.createdAt);
   const createdLabel = `${createdAt.getMonth() + 1}月${createdAt.getDate()}日 ${String(createdAt.getHours()).padStart(2, "0")}:${String(createdAt.getMinutes()).padStart(2, "0")}`;
@@ -74,11 +78,13 @@ export function DetailPane() {
         <div className="flex items-center gap-1">
           <button
             type="button"
-            title={task.completedAt ? "标记为未完成" : "标记为完成"}
+            title={
+              task.completedAt || repeatDone ? "标记为未完成" : "标记为完成"
+            }
             onClick={() => toggleTask(task.id)}
             className={cn(
               "flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
-              task.completedAt
+              task.completedAt || repeatDone
                 ? "text-ok hover:bg-ok/10"
                 : "text-ink3 hover:bg-panel2 hover:text-ok",
             )}
@@ -142,6 +148,95 @@ export function DetailPane() {
         </div>
         <div className="mt-2">
           <DatePicker value={task.dueDate} onChange={(v) => patch({ dueDate: v })} />
+        </div>
+        {task.repeat && (
+          <p className="mt-1.5 text-[11px] leading-relaxed text-ink3">
+            {formatRepeat(task.repeat)}重复 · 勾选完成后自动滚到下一次，划掉状态持续到当期结束
+          </p>
+        )}
+      </section>
+
+      {/* 重复 */}
+      <section className="rounded-2xl bg-panel2/50 p-3.5">
+        <span className={labelCls}>重复</span>
+        <div className="flex gap-1.5">
+          {(
+            [
+              { label: "不重复", active: !task.repeat, rule: undefined },
+              { label: "每天", active: task.repeat?.kind === "daily", rule: { kind: "daily" as const } },
+              {
+                label: "工作日",
+                active: task.repeat?.kind === "workday",
+                rule: { kind: "workday" as const },
+              },
+            ] as Array<{ label: string; active: boolean; rule: RepeatRule | undefined }>
+          ).map((q) => (
+            <button
+              key={q.label}
+              type="button"
+              onClick={() => patch({ repeat: q.rule })}
+              className={cn(
+                "flex h-7 flex-1 items-center justify-center rounded-lg text-xs transition-colors",
+                q.active
+                  ? "bg-panel2 font-semibold shadow-sm text-accent"
+                  : "text-ink3 hover:bg-panel2/60",
+              )}
+            >
+              {q.label}
+            </button>
+          ))}
+        </div>
+        <div className="mt-1.5 flex gap-1">
+          {Array.from("日一二三四五六").map((ch, dow) => {
+            const active =
+              task.repeat?.kind === "weekly" && task.repeat.dow === dow;
+            return (
+              <button
+                key={dow}
+                type="button"
+                onClick={() => patch({ repeat: { kind: "weekly", dow } })}
+                className={cn(
+                  "h-7 flex-1 rounded-lg text-xs transition-colors",
+                  active
+                    ? "bg-panel2 font-semibold shadow-sm text-accent"
+                    : "text-ink3 hover:bg-panel2/60",
+                )}
+              >
+                {ch}
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <span
+            className={cn(
+              "rounded-lg px-2 py-1 text-xs transition-colors",
+              task.repeat?.kind === "monthly"
+                ? "bg-panel2 font-semibold text-accent"
+                : "text-ink3",
+            )}
+          >
+            每月
+          </span>
+          <select
+            value={task.repeat?.kind === "monthly" ? task.repeat.day : ""}
+            onChange={(e) => {
+              const day = Number(e.target.value);
+              if (day >= 1) patch({ repeat: { kind: "monthly", day } });
+            }}
+            aria-label="每月重复日"
+            className={cn(fieldCls, "w-24 py-1")}
+          >
+            <option value="">选择日…</option>
+            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+              <option key={d} value={d}>
+                {d} 日
+              </option>
+            ))}
+          </select>
+          {task.repeat?.kind === "monthly" && (
+            <span className="text-[11px] text-ink3">大月无该日自动落到月末</span>
+          )}
         </div>
       </section>
 

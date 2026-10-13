@@ -1,9 +1,20 @@
 // 领域操作：全部为 (db, ...) -> 新 db 的纯函数（不可变更新）。
 
-import type { Database, ID, Priority, ProxyConfig, Task, TaskList } from "./models";
+import type { Database, ID, Priority, ProxyConfig, RepeatRule, Task, TaskList } from "./models";
 import { DEFAULT_INBOX_ID, DEFAULT_INBOX_NAME, DEFAULT_PROXY } from "./models";
 import { newId } from "./ids";
 import { todayStr, isToday, isOverdue, diffDays } from "./dates";
+import {
+  DONE_LOG_CAP,
+  currentOccurrence,
+  effectiveDue,
+  latestOccurrence,
+  nextOccurrence,
+  normalizeDoneLog,
+  normalizeRepeat,
+  previousOccurrence,
+  recurringDone,
+} from "./repeat";
 
 /** 永久删除墓碑账本的保留天数（超期条目必然已传播到所有设备，丢弃安全） */
 const PURGE_LOG_RETENTION_DAYS = 90;
@@ -30,6 +41,36 @@ export function emptyDatabase(now: Date = new Date()): Database {
       lastSyncAt: null,
     },
   };
+}
+
+/** 任务已知字段：normalize 时显式清洗；其余字段原样透传（向前兼容，见下） */
+const TASK_KNOWN_FIELDS = new Set([
+  "id",
+  "listId",
+  "title",
+  "notes",
+  "dueDate",
+  "priority",
+  "sortOrder",
+  "completedAt",
+  "doneLog",
+  "repeat",
+  "createdAt",
+  "updatedAt",
+  "deletedAt",
+]);
+
+/**
+ * 未知字段透传：新版客户端加的字段（如更新版本的 repeat 扩展），旧版读到时
+ * 原样保留，回写不丢——否则「新设备写入 → 旧设备同步剥离 → LWW 回灌」会
+ * 绞杀新字段。透传的字段不经清洗，信任写入方。
+ */
+function forwardUnknownFields(raw: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(raw)) {
+    if (!TASK_KNOWN_FIELDS.has(k)) out[k] = raw[k];
+  }
+  return out;
 }
 
 /** 修复/补全外部或历史数据，保证字段完整（导入、迁移用） */
@@ -60,19 +101,25 @@ export function normalizeDatabase(raw: unknown, now: Date = new Date()): Databas
           typeof t.listId === "string" &&
           typeof t.title === "string",
       )
-      .map((t) => ({
-        id: t.id,
-        listId: t.listId,
-        title: t.title,
-        notes: typeof t.notes === "string" ? t.notes : undefined,
-        dueDate: typeof t.dueDate === "string" ? t.dueDate : undefined,
-        priority: (t.priority ?? 0) as Priority,
-        sortOrder: typeof t.sortOrder === "number" ? t.sortOrder : 0,
-        completedAt: t.completedAt ?? null,
-        createdAt: t.createdAt ?? nowIso(now),
-        updatedAt: t.updatedAt ?? nowIso(now),
-        deletedAt: t.deletedAt ?? null,
-      }));
+      .map((t) => {
+        const clean: Task = {
+          id: t.id,
+          listId: t.listId,
+          title: t.title,
+          notes: typeof t.notes === "string" ? t.notes : undefined,
+          dueDate: typeof t.dueDate === "string" ? t.dueDate : undefined,
+          priority: (t.priority ?? 0) as Priority,
+          sortOrder: typeof t.sortOrder === "number" ? t.sortOrder : 0,
+          completedAt: t.completedAt ?? null,
+          repeat: normalizeRepeat(t.repeat),
+          doneLog: normalizeDoneLog(t.doneLog),
+          createdAt: t.createdAt ?? nowIso(now),
+          updatedAt: t.updatedAt ?? nowIso(now),
+          deletedAt: t.deletedAt ?? null,
+        };
+        // 未知字段在前、清洗字段在后：同名字段一律以清洗结果为准
+        return { ...forwardUnknownFields(t as unknown as Record<string, unknown>), ...clean };
+      });
   }
   if (obj.settings && typeof obj.settings === "object") {
     db.settings = {
@@ -107,11 +154,14 @@ export function normalizeProxy(raw: unknown): ProxyConfig {
   };
 }
 
-/** 首次启动：确保存在收集箱。
- *  新库用固定 id（多台新设备首次同步天然并成同一个收集箱）；
+/** 首次启动：确保存在起始列表。
+ *  仅当「没有任何活列表」（全新库 / 用户删光了所有列表）时创建；用户把收集箱
+ *  改名（如改成「杂项」）是合法状态，不再按名字重建——旧逻辑按名字匹配，改名后
+ *  每次启动都会 resurrect 一个新「收集箱」（尤其老数据收集箱是随机 id，固定 id
+ *  检查也拦不住）。新库用固定 id（多台新设备首次同步天然并成同一个收集箱）；
  *  固定 id 已被墓碑占用时退回随机 id，避免同 id 冲突。 */
 export function ensureInbox(db: Database, now: Date = new Date()): Database {
-  if (db.lists.some((l) => l.name === DEFAULT_INBOX_NAME && !l.deletedAt)) {
+  if (db.lists.some((l) => !l.deletedAt)) {
     return db;
   }
   if (!db.lists.some((l) => l.id === DEFAULT_INBOX_ID)) {
@@ -173,6 +223,8 @@ export interface CreateTaskFields {
   dueDate?: string;
   priority?: Priority;
   notes?: string;
+  /** 重复规则：缺 dueDate 或 dueDate 已过期时自动锚定到当期发生日 */
+  repeat?: RepeatRule;
 }
 
 export function createTask(
@@ -183,15 +235,22 @@ export function createTask(
   const listId = fields.listId ?? defaultListId(db);
   const active = db.tasks.filter((t) => !t.deletedAt && !t.completedAt);
   const minSort = active.length ? Math.min(...active.map((t) => t.sortOrder)) : 0;
+  const today = todayStr(now);
+  // 重复任务锚点：无日期或日期已过期 → 当期发生日（"每天 背单词"无日期也能落进今天视图）
+  const dueDate =
+    fields.repeat && (!fields.dueDate || fields.dueDate < today)
+      ? currentOccurrence(fields.repeat, today, fields.dueDate)
+      : fields.dueDate;
   const task: Task = {
     id: newId(),
     listId,
     title: fields.title,
     notes: fields.notes,
-    dueDate: fields.dueDate,
+    dueDate,
     priority: fields.priority ?? 0,
     sortOrder: minSort - 1,
     completedAt: null,
+    repeat: fields.repeat,
     createdAt: nowIso(now),
     updatedAt: nowIso(now),
     deletedAt: null,
@@ -211,15 +270,29 @@ function defaultListId(db: Database): ID {
 export function updateTask(
   db: Database,
   id: ID,
-  patch: Partial<Pick<Task, "title" | "notes" | "dueDate" | "priority" | "listId">>,
+  patch: Partial<Pick<Task, "title" | "notes" | "dueDate" | "priority" | "listId" | "repeat">>,
   now: Date = new Date(),
 ): Database {
   const ts = nowIso(now);
+  const today = todayStr(now);
   return {
     ...db,
-    tasks: db.tasks.map((t) =>
-      t.id === id ? { ...t, ...patch, updatedAt: ts } : t,
-    ),
+    tasks: db.tasks.map((t) => {
+      if (t.id !== id) return t;
+      const next: Task = { ...t, ...patch, updatedAt: ts };
+      // 规则变更的配套处理（用 'repeat' in patch 区分「显式清除」与「未提及」）：
+      // - 清除规则 → 退化为普通任务，打卡日志一并清除
+      // - 设置/更换规则 → 锚点缺失或已过期时重锚到新规则的当期发生日
+      //   （锚点仍在未来则保留，作为新规则的第一个截止日，完成一次后网格自然对齐）
+      if ("repeat" in patch) {
+        if (!next.repeat) {
+          next.doneLog = undefined;
+        } else if (!next.dueDate || next.dueDate < today) {
+          next.dueDate = currentOccurrence(next.repeat, today, next.dueDate);
+        }
+      }
+      return next;
+    }),
   };
 }
 
@@ -229,17 +302,39 @@ export function toggleTask(
   now: Date = new Date(),
 ): Database {
   const ts = nowIso(now);
+  const today = todayStr(now);
   return {
     ...db,
-    tasks: db.tasks.map((t) =>
-      t.id === id
-        ? {
-            ...t,
-            completedAt: t.completedAt ? null : ts,
-            updatedAt: ts,
-          }
-        : t,
-    ),
+    tasks: db.tasks.map((t) => {
+      if (t.id !== id) return t;
+      // 重复任务：勾选 = 记当期打卡并滚动到下一期；取消 = 精确逆向回滚。
+      // completedAt 恒为 null（任务永远留在列表里），「划掉到下一次发生日 0 点」
+      // 由 doneLog + dueDate 推导（repeat.ts recurringDone），跨 0 点无需任何刷新。
+      if (t.repeat) {
+        if (recurringDone(t, today)) {
+          // 取消勾选：当期 = 下一次发生日的上一期，从日志移除、锚点滚回
+          const period = previousOccurrence(t.repeat, t.dueDate ?? today);
+          const log = (t.doneLog ?? []).filter((d) => d !== period);
+          return { ...t, dueDate: period, doneLog: log.length ? log : undefined, updatedAt: ts };
+        }
+        // 勾选：锚点仍有效（未来/今天）→ 记锚点期（含提前勾）；
+        // 锚点已过期（补勾）→ 记今天为止最近的发生日——每天补勾记今天不补 3 天，
+        // 每周二拖到周三勾记周二那期，网格不漂移。
+        const period =
+          !t.dueDate || t.dueDate < today
+            ? latestOccurrence(t.repeat, today)
+            : t.dueDate;
+        const log = [...(t.doneLog ?? []).filter((d) => d !== period), period].slice(
+          -DONE_LOG_CAP,
+        );
+        return { ...t, dueDate: nextOccurrence(t.repeat, period), doneLog: log, updatedAt: ts };
+      }
+      return {
+        ...t,
+        completedAt: t.completedAt ? null : ts,
+        updatedAt: ts,
+      };
+    }),
   };
 }
 
@@ -473,25 +568,39 @@ export function tasksInList(db: Database, listId: ID): Task[] {
   return sortTasks(db.tasks.filter((t) => t.listId === listId && !t.deletedAt));
 }
 
-/** 今天视图：所有到期日 <= 今天的未完成任务（逾期优先展示） */
+/**
+ * 今天视图：到期日 <= 今天的未完成任务（逾期优先展示）。
+ * 重复任务按「当期发生日」口径：到期即为今天（拖了几天没打卡不倒贴逾期），
+ * 且当天已打卡（划掉态）的也留在今天视图展示——打卡记录要可见。
+ */
 export function todayTasks(db: Database, today: string = todayStr()): Task[] {
   return sortTasks(
-    db.tasks.filter(
-      (t) => isActive(t) && !!t.dueDate && diffDays(t.dueDate, today) <= 0,
-    ),
+    db.tasks.filter((t) => {
+      if (!isActive(t)) return false;
+      if (t.repeat) {
+        return recurringDone(t, today) || effectiveDue(t, today) === today;
+      }
+      return !!t.dueDate && diffDays(t.dueDate, today) <= 0;
+    }),
   );
 }
 
-/** 计划视图：未来 7 天（不含今天） */
+/** 计划视图：未来 7 天（不含今天）；重复任务按当期发生日口径 */
 export function upcomingTasks(db: Database, today: string = todayStr()): Task[] {
   return sortTasks(
-    db.tasks.filter(
-      (t) =>
-        isActive(t) &&
+    db.tasks.filter((t) => {
+      if (!isActive(t)) return false;
+      if (t.repeat) {
+        if (recurringDone(t, today)) return false;
+        const d = diffDays(effectiveDue(t, today), today);
+        return d > 0 && d <= 7;
+      }
+      return (
         !!t.dueDate &&
         diffDays(t.dueDate, today) > 0 &&
-        diffDays(t.dueDate, today) <= 7,
-    ),
+        diffDays(t.dueDate, today) <= 7
+      );
+    }),
   );
 }
 
@@ -531,18 +640,26 @@ export function countByList(db: Database): Map<ID, number> {
   return m;
 }
 
-/** 今天已完成数（今日视图的成就感小数字） */
+/** 今天已完成数（今日视图的成就感小数字）：普通任务看 completedAt，重复任务看当期打卡日志 */
 export function completedTodayCount(
   db: Database,
   today: string = todayStr(),
 ): number {
-  return db.tasks.filter(
-    (t) => t.completedAt && isToday(t.completedAt.slice(0, 10), today),
-  ).length;
+  let n = 0;
+  for (const t of db.tasks) {
+    if (t.completedAt && isToday(t.completedAt.slice(0, 10), today)) n += 1;
+    n += t.doneLog?.filter((d) => d === today).length ?? 0;
+  }
+  return n;
 }
 
+/** 重复任务永不过期（当期发生日口径，拖了没打卡不算逾期） */
 export function overdueCount(db: Database, today: string = todayStr()): number {
   return db.tasks.filter(
-    (t) => isActive(t) && !!t.dueDate && isOverdue(t.dueDate, today),
+    (t) =>
+      isActive(t) &&
+      !t.repeat &&
+      !!t.dueDate &&
+      isOverdue(t.dueDate, today),
   ).length;
 }

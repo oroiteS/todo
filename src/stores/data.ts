@@ -10,6 +10,7 @@ import type {
   GitHubSyncConfig,
   ID,
   Priority,
+  RepeatRule,
   Settings,
   Task,
   TaskList,
@@ -37,10 +38,11 @@ interface DataStore {
     priority?: Priority;
     listId?: ID;
     notes?: string;
+    repeat?: RepeatRule;
   }): Task | null;
   updateTask(
     id: ID,
-    patch: Partial<Pick<Task, "title" | "notes" | "dueDate" | "priority" | "listId">>,
+    patch: Partial<Pick<Task, "title" | "notes" | "dueDate" | "priority" | "listId" | "repeat">>,
   ): void;
   toggleTask(id: ID): void;
   deleteTask(id: ID): void;

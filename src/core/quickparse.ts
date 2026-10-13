@@ -3,10 +3,14 @@
 //   "周五 开会"                  -> 本周五到期
 //   "3月8日 给妈妈打电话 !!"     -> 日期 + 中优先级
 //   "下周三 复盘"                -> 下周三
+//   "每天 背单词"                -> 每天重复，锚定今天
+//   "每周二 组会"                -> 每周二重复，锚定最近一个周二
+//   "每月1号 缴费"               -> 每月1日重复
+//   "工作日 写日报"              -> 工作日重复
 // 日期词支持紧跟中文（"明天交报告"）也可空格分隔；#列表 需匹配已有列表。
 // 优先级/列表记号兼容全角：「！高」「！！」「＃工作」与半角等价（中文输入法免切换）。
 
-import type { Priority } from "./models";
+import type { Priority, RepeatRule } from "./models";
 import {
   addDays,
   mondayBasedDow,
@@ -20,6 +24,8 @@ export interface ParsedQuickAdd {
   dueDate?: string;
   priority?: Priority;
   listQuery?: string;
+  /** 重复规则：到期日词与重复词同时出现时，日期词作为规则的首期锚点 */
+  repeat?: RepeatRule;
 }
 
 const DAY_CN: Record<string, number> = {
@@ -40,6 +46,11 @@ const DAY_CN: Record<string, number> = {
 const DATE_PREFIX_RE =
   /^(今天|今日|明天|明日|后天|大后天|(?:下?周|下?星期|下?礼拜)([一二三四五六日末天])|(?:(\d{4})年)?(\d{1,2})月(\d{1,2})[日号]|(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})|(\d{1,2})[\/\-](\d{1,2}))(?=[\s\u4e00-\u9fff]|$)/;
 
+// 从字符串开头起匹配的重复词（与日期词同一「可紧贴中文」约定）。
+// "每周"不带星期几时不消费（语义不明，保留在标题里）；"每月1号/每月31日"限 1-31。
+const RECURRENCE_RE =
+  /^(每天|每日|工作日|每个?周([一二三四五六日末天])|每个?月([1-9]|[12]\d|3[01])[日号])(?=[\s\u4e00-\u9fff]|$)/;
+
 export function parseQuickAdd(
   input: string,
   now: Date = new Date(),
@@ -49,6 +60,15 @@ export function parseQuickAdd(
   let dueDate: string | undefined;
   let priority: Priority | undefined;
   let listQuery: string | undefined;
+  let repeat: RepeatRule | undefined;
+
+  // 0) 连续吃掉开头的重复词（先于日期词："每周二"不会被拆成"周二"）
+  for (;;) {
+    const m = RECURRENCE_RE.exec(rest);
+    if (!m) break;
+    repeat = resolveRecurrenceMatch(m);
+    rest = rest.slice(m[0].length).replace(/^\s+/, "");
+  }
 
   // 1) 连续吃掉开头的日期词（如 "明天 周五 …" 取最后一个）
   for (;;) {
@@ -86,7 +106,15 @@ export function parseQuickAdd(
     dueDate,
     priority,
     listQuery,
+    repeat,
   };
+}
+
+function resolveRecurrenceMatch(m: RegExpExecArray): RepeatRule {
+  if (m[1] === "每天" || m[1] === "每日") return { kind: "daily" };
+  if (m[1] === "工作日") return { kind: "workday" };
+  if (m[2]) return { kind: "weekly", dow: DAY_CN[m[2]] ?? 1 };
+  return { kind: "monthly", day: Number(m[3]) };
 }
 
 function resolveDateMatch(
