@@ -36,8 +36,7 @@ flowchart LR
   ],
   "nearest": [                     // 离今天最近（小组件主展示源）：到期日升序（逾期→今天→未来），同日保持手动排序，无日期垫底，最多 10 条；v1.2 新增
     { "id": "...", "title": "交周报", "listName": "工作", "dueDate": "2026-01-14", "priority": 2 }
-  ],
-  "counts": {
+  ],  "counts": {
     "today": 3,          // 今天到期总数（不受 10 条截断影响）
     "upcoming": 5,       // 未来 7 天
     "all": 42,           // 全部未完成
@@ -48,6 +47,11 @@ flowchart LR
 ```
 
 推送时机（已实现）：任务/列表任何变更后防抖 600ms 自动推送；应用启动时推送一次。
+
+重复任务口径（v1.3 起，前端 `src/core/repeat.ts`、托盘镜像 `tray.rs` 同逻辑）：
+`today`/`nearest` 里重复任务按「当期发生日」出现（`effectiveDue`，永不过去——拖了几天
+没打卡显示今天，不倒贴逾期）；当天已打卡（划掉态，`recurringDone`）的当期不占
+`nearest` 位、不计 `counts.today`，但计入 `counts.completedToday`。快照 schema 不变。
 
 ## 3. 平台落点（已实现，`src-tauri/src/widget/platform.rs`）
 
