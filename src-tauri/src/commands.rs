@@ -71,6 +71,13 @@ pub fn write_database(app: tauri::AppHandle, data: Value) -> Result<(), String> 
         let _ = f.sync_all();
     }
     fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+
+    // 数据落盘后立即重建托盘菜单（右上角显示实时化，与 Android 小组件
+    // 「写完快照立刻 refreshAll」同构）。macOS 托盘菜单在 mouseDown 同步弹出、
+    // 点击事件异步派发赶不上弹出时机，只能走数据驱动的主动刷新，见 tray::refresh。
+    #[cfg(desktop)]
+    crate::tray::refresh(&app);
+
     Ok(())
 }
 
