@@ -1,7 +1,8 @@
 import { FileText, Flag, GripVertical, Repeat, Undo2, X } from "lucide-react";
 import type { Task, TaskList } from "@/core/models";
-import { formatDue, isOverdue, isToday, todayStr } from "@/core/dates";
+import { todayStr } from "@/core/dates";
 import { effectiveDue, formatRepeat, recurringDone } from "@/core/repeat";
+import { rowDateChip, type ChipTone } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { Checkbox } from "./Checkbox";
 
@@ -147,7 +148,6 @@ function RowChips({
 }) {
   const today = todayStr();
   const recurringFinished = task.repeat ? recurringDone(task, today) : false;
-  const done = !!task.completedAt || recurringFinished;
   // 重复任务按当期发生日口径展示（拖了没打卡显示今天/未来，不显示逾期）；
   // 打卡态下隐藏日期角标，只留重复角标（划掉行更干净）
   const due = task.repeat
@@ -158,8 +158,13 @@ function RowChips({
   const hasNotes = !!task.notes?.trim();
   if ((!showList || !list) && !due && !hasNotes && !task.repeat) return null;
 
-  const overdue = !done && !!due && !task.repeat && isOverdue(due, today);
-  const todayDue = !done && !!due && isToday(due, today);
+  // 已完成（普通任务）→ 只显示完成时间；未完成 → 到期日角标。
+  // 重复任务打卡态没有 completedAt，走 due=undefined，天然不显示角标。
+  const chip = rowDateChip(
+    due,
+    recurringFinished ? null : task.completedAt,
+    today,
+  );
 
   return (
     <div className="mt-1 flex flex-wrap items-center gap-1.5">
@@ -183,18 +188,14 @@ function RowChips({
           {list.emoji} {list.name}
         </span>
       )}
-      {due && (
+      {chip && (
         <span
           className={cn(
             "rounded-md px-1.5 py-0.5 text-[11px] font-medium",
-            overdue
-              ? "bg-danger/10 text-danger"
-              : todayDue
-                ? "bg-warn/10 text-warn"
-                : "bg-ink3/10 text-ink2",
+            CHIP_TONE_CLS[chip.tone],
           )}
         >
-          {formatDue(due, today)}
+          {chip.text}
         </span>
       )}
       {hasNotes && (
@@ -205,3 +206,10 @@ function RowChips({
     </div>
   );
 }
+
+const CHIP_TONE_CLS: Record<ChipTone, string> = {
+  ok: "bg-ok/10 text-ok",
+  danger: "bg-danger/10 text-danger",
+  warn: "bg-warn/10 text-warn",
+  muted: "bg-ink3/10 text-ink2",
+};
