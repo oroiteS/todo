@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowUp, CircleHelp, Plus } from "lucide-react";
 import { parseQuickAdd } from "@/core/quickparse";
+import type { TaskSort } from "@/core/task-sort";
 import { formatDue } from "@/core/dates";
 import { formatRepeat } from "@/core/repeat";
 import { visibleLists } from "@/core/operations";
@@ -209,6 +210,8 @@ function HelpPopover() {
  */
 export function QuickAdd({ currentListId }: { currentListId?: string }) {
   const [text, setText] = useState("");
+  const taskSort = useUiStore((s) => s.taskSort);
+  const setTaskSort = useUiStore((s) => s.setTaskSort);
   const addTask = useDataStore((s) => s.addTask);
   const db = useDataStore((s) => s.db);
   const lists = useMemo(() => visibleLists(db), [db]);
@@ -289,7 +292,7 @@ export function QuickAdd({ currentListId }: { currentListId?: string }) {
           autoComplete="off"
           spellCheck={false}
           placeholder="添加任务，回车保存（例：明天 交作业 !高 #英语）"
-          className="w-full bg-transparent text-sm outline-none placeholder:text-ink3/80"
+          className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink3/80"
         />
         {/* 输入格式帮助：放输入框与提交按钮之间，见即知是关于输入的 */}
         <HelpPopover />
@@ -306,6 +309,19 @@ export function QuickAdd({ currentListId }: { currentListId?: string }) {
         >
           <ArrowUp size={14} strokeWidth={2.5} />
         </button>
+        <label className="flex shrink-0 items-center gap-1 border-l border-line pl-2 text-xs text-ink2">
+          <span>排序</span>
+          <select
+            aria-label="排序"
+            value={taskSort}
+            onChange={(e) => setTaskSort(e.target.value as TaskSort)}
+            className="max-w-[5.5rem] cursor-pointer rounded bg-transparent py-1 text-xs text-ink2 outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <option value="dueDate">到期时间</option>
+            <option value="priority">重要性</option>
+            <option value="title">名称</option>
+          </select>
+        </label>
       </div>
       {showPreview && parsed && (
         // 语法速查：日期词在开头（今天/明天/后天/周X/下周X/M月D日/M/D），

@@ -1,4 +1,3 @@
-import { Fragment, useRef, useState } from "react";
 import { ChevronDown, Trash2 } from "lucide-react";
 import type { Task } from "@/core/models";
 import {
@@ -11,6 +10,7 @@ import {
 } from "@/core/operations";
 import { todayStr } from "@/core/dates";
 import { recurringDone } from "@/core/repeat";
+import { sortDisplayTasks } from "@/core/task-sort";
 import { useDataStore } from "@/stores/data";
 import { useUiStore } from "@/stores/ui";
 import { cn } from "@/lib/cn";
@@ -24,6 +24,7 @@ export function TaskListPane() {
   const db = useDataStore((s) => s.db);
   const view = useUiStore((s) => s.view);
   const searchQuery = useUiStore((s) => s.searchQuery);
+  const taskSort = useUiStore((s) => s.taskSort);
   const showCompleted = useUiStore((s) => s.showCompleted);
   const toggleShowCompleted = useUiStore((s) => s.toggleShowCompleted);
   const selectedTaskId = useUiStore((s) => s.selectedTaskId);
@@ -33,13 +34,6 @@ export function TaskListPane() {
   const restoreTask = useDataStore((s) => s.restoreTask);
   const purgeTask = useDataStore((s) => s.purgeTask);
   const emptyTrash = useDataStore((s) => s.emptyTrash);
-  const reorderTask = useDataStore((s) => s.reorderTask);
-
-  const listRef = useRef<HTMLDivElement>(null);
-  const dragState = useRef<{ id: string; startIndex: number; target: number } | null>(null);
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [overIndex, setOverIndex] = useState<number | null>(null);
-
   const today = todayStr();
   const searching = searchQuery.trim().length > 0;
 
@@ -92,58 +86,13 @@ export function TaskListPane() {
     }
   }
 
+  tasks = sortDisplayTasks(tasks, taskSort, today);
   const active = tasks.filter((t) => !t.completedAt);
   const done = tasks.filter((t) => t.completedAt);
   // 重复任务的打卡完成不计入 done 区（原位划掉），但计入进度胶囊——
   // 与小组件「已完成 N」同口径
   const recurringDoneCount = tasks.filter((t) => recurringDone(t, today)).length;
   const doneCount = done.length + recurringDoneCount;
-  const activeIds = active.map((t) => t.id);
-  const allowDrag = mode === "normal" && view.kind === "list" && viewExists;
-  const showListChips = mode === "search" || view.kind === "smart";
-
-  // ---------- 拖拽排序 ----------
-  const beginDrag = (task: Task) => (e: React.PointerEvent) => {
-    if (!allowDrag) return;
-    e.preventDefault();
-    const startIndex = activeIds.indexOf(task.id);
-    if (startIndex < 0) return;
-    dragState.current = { id: task.id, startIndex, target: startIndex };
-    setDragId(task.id);
-    setOverIndex(startIndex);
-
-    const onMove = (ev: PointerEvent) => {
-      const rows = listRef.current?.querySelectorAll<HTMLElement>("[data-task-row]");
-      if (!rows || !dragState.current) return;
-      let idx = rows.length;
-      for (let i = 0; i < rows.length; i++) {
-        const r = rows[i].getBoundingClientRect();
-        if (ev.clientY < r.top + r.height / 2) {
-          idx = i;
-          break;
-        }
-      }
-      dragState.current.target = idx;
-      setOverIndex(idx);
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      const st = dragState.current;
-      dragState.current = null;
-      setDragId(null);
-      setOverIndex(null);
-      if (!st) return;
-      let target = st.target;
-      if (target > st.startIndex) target -= 1; // 移除自身后的下标
-      if (target !== st.startIndex) {
-        reorderTask(st.id, activeIds, target);
-      }
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  };
-
   // ---------- 头部 ----------
   const now = new Date();
   const headerRight =
@@ -260,29 +209,20 @@ export function TaskListPane() {
 
       {mode === "normal" && viewExists && <QuickAdd currentListId={currentListId} />}
 
-      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-4 pb-28">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-28">
         {active.length === 0 && done.length === 0 && emptyState}
 
         <div className="flex flex-col gap-0.5">
-          {active.map((t, i) => (
-            <Fragment key={t.id}>
-              {mode === "normal" && dragId && overIndex === i && <Indicator />}
-              <TaskRow
-                {...rowCommon(t)}
-                trashMode={mode === "trash"}
-                onRestore={() => restoreTask(t.id)}
-                onPurge={() => purgeTask(t.id)}
-                dragging={mode === "normal" && dragId === t.id}
-                dragHandleProps={
-                  mode === "normal" && allowDrag
-                    ? { onPointerDown: beginDrag(t) }
-                    : undefined
-                }
-                onToggle={() => toggleTask(t.id)}
-              />
-            </Fragment>
+          {active.map((t) => (
+            <TaskRow
+              key={t.id}
+              {...rowCommon(t)}
+              trashMode={mode === "trash"}
+              onRestore={() => restoreTask(t.id)}
+              onPurge={() => purgeTask(t.id)}
+              onToggle={() => toggleTask(t.id)}
+            />
           ))}
-          {mode === "normal" && dragId && overIndex === active.length && <Indicator />}
         </div>
 
         {done.length > 0 && (
@@ -317,8 +257,4 @@ export function TaskListPane() {
       </div>
     </main>
   );
-}
-
-function Indicator() {
-  return <div className="mx-3 h-[2px] shrink-0 rounded-full bg-accent/70" />;
 }

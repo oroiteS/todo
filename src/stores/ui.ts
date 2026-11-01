@@ -1,6 +1,17 @@
 // UI 状态：当前视图 / 选中任务 / 搜索 / 弹层
 
 import { create } from "zustand";
+import type { TaskSort } from "@/core/task-sort";
+
+const SORT_KEY = "todolite.taskSort";
+function loadTaskSort(): TaskSort {
+  try {
+    const value = localStorage.getItem(SORT_KEY);
+    return value === "priority" || value === "title" ? value : "dueDate";
+  } catch {
+    return "dueDate";
+  }
+}
 
 export type SmartViewId = "today" | "upcoming" | "all";
 
@@ -22,6 +33,8 @@ interface UiStore {
   settingsOpen: boolean;
   sidebarOpen: boolean;
   showCompleted: boolean;
+  taskSort: TaskSort;
+  setTaskSort(sort: TaskSort): void;
   setView(v: View): void;
   selectTask(id: string | null): void;
   setSearch(q: string): void;
@@ -37,6 +50,11 @@ export const useUiStore = create<UiStore>((set) => ({
   settingsOpen: false,
   sidebarOpen: false,
   showCompleted: true,
+  taskSort: loadTaskSort(),
+  setTaskSort: (sort) => {
+    try { localStorage.setItem(SORT_KEY, sort); } catch { /* session-only preference */ }
+    set({ taskSort: sort });
+  },
   setView: (v) =>
     set({ view: v, selectedTaskId: null, searchQuery: "", sidebarOpen: false }),
   selectTask: (id) => set({ selectedTaskId: id }),
